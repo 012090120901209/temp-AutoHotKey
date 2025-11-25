@@ -1,0 +1,262 @@
+; Advanced Process Automation and Workflow Management
+; Demonstrates process orchestration, scheduling, and automation workflows
+
+class WorkflowEngine {
+    _steps := []
+    _currentStep := 0
+    _onStepComplete := ""
+    _onWorkflowComplete := ""
+    _onError := ""
+
+    AddStep(name, action) {
+        this._steps.Push({name, action, completed: false})
+        return this
+    }
+
+    OnStepComplete(handler) {
+        this._onStepComplete := handler
+        return this
+    }
+
+    OnWorkflowComplete(handler) {
+        this._onWorkflowComplete := handler
+        return this
+    }
+
+    OnError(handler) {
+        this._onError := handler
+        return this
+    }
+
+    Run() {
+        this._Execute(0)
+    }
+
+    _Execute(index) {
+        if (index >= this._steps.Length) {
+            if (this._onWorkflowComplete)
+                this._onWorkflowComplete()
+            return
+        }
+
+        step := this._steps[index]
+
+        try {
+            step.action()
+            step.completed := true
+
+            if (this._onStepComplete)
+                this._onStepComplete(step.name)
+
+            ; Continue to next step
+            this._Execute(index + 1)
+        } catch Error as e {
+            if (this._onError)
+                this._onError(step.name, e.Message)
+        }
+    }
+
+    GetProgress() {
+        completed := 0
+        for step in this._steps {
+            if (step.completed)
+                completed++
+        }
+        return completed . "/" . this._steps.Length
+    }
+}
+
+workflow := WorkflowEngine()
+    .AddStep("Initialize", () => (OutputDebug("Initializing..."), Sleep(100)))
+    .AddStep("Process", () => (OutputDebug("Processing..."), Sleep(100)))
+    .AddStep("Cleanup", () => (OutputDebug("Cleaning up..."), Sleep(100)))
+    .OnStepComplete((name) => OutputDebug("Completed: " . name))
+    .OnWorkflowComplete(() => OutputDebug("Workflow complete!"))
+
+; Task scheduler
+class TaskScheduler {
+    _tasks := Map()
+    _timerId := ""
+
+    Schedule(name, intervalMs, handler) {
+        this._tasks[name] := {handler, interval: intervalMs, lastRun: 0}
+        return this
+    }
+
+    Start() {
+        this._timerId := SetTimer(() => this._CheckTasks(), 100)
+        return this
+    }
+
+    Stop() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+        return this
+    }
+
+    _CheckTasks() {
+        now := A_TickCount
+
+        for name, task in this._tasks {
+            if (now - task.lastRun >= task.interval) {
+                try {
+                    task.handler()
+                    task.lastRun := now
+                } catch Error as e {
+                    OutputDebug("Task error: " . e.Message)
+                }
+            }
+        }
+    }
+
+    Remove(name) {
+        this._tasks.Delete(name)
+        return this
+    }
+}
+
+scheduler := TaskScheduler()
+scheduler.Schedule("healthCheck", 1000, () => OutputDebug("Health check..."))
+scheduler.Start()
+
+; Retry mechanism
+class Retry {
+    _maxRetries := 3
+    _delayMs := 100
+    _backoffMultiplier := 2
+
+    __New(maxRetries := 3, delayMs := 100) {
+        this._maxRetries := maxRetries
+        this._delayMs := delayMs
+    }
+
+    Execute(fn) {
+        for attempt in range(1, this._maxRetries + 1) {
+            try {
+                return fn()
+            } catch Error as e {
+                if (attempt = this._maxRetries) {
+                    throw e
+                }
+
+                delay := this._delayMs * (this._backoffMultiplier ** (attempt - 1))
+                Sleep(delay)
+            }
+        }
+    }
+}
+
+range(start, end) {
+    result := []
+    loop (end - start) {
+        result.Push(start + A_Index - 1)
+    }
+    return result
+}
+
+retry := Retry(3, 100)
+
+attemptCount := 0
+try {
+    retry.Execute(() => (
+        attemptCount++,
+        attemptCount < 2 ? (throw Error("Failed")) : "Success"
+    ))
+    MsgBox("Succeeded after " . attemptCount . " attempts")
+} catch Error as e {
+    MsgBox("Failed: " . e.Message)
+}
+
+; Batch processor
+class BatchProcessor {
+    _items := []
+    _batchSize := 10
+    _onBatch := ""
+
+    AddItems(items) {
+        for item in items {
+            this._items.Push(item)
+        }
+        return this
+    }
+
+    SetBatchSize(size) {
+        this._batchSize := size
+        return this
+    }
+
+    OnBatch(handler) {
+        this._onBatch := handler
+        return this
+    }
+
+    Process() {
+        batch := []
+        for item in this._items {
+            batch.Push(item)
+
+            if (batch.Length >= this._batchSize) {
+                if (this._onBatch)
+                    this._onBatch(batch.Clone())
+                batch := []
+            }
+        }
+
+        if (batch.Length > 0 && this._onBatch) {
+            this._onBatch(batch)
+        }
+    }
+}
+
+processor := BatchProcessor()
+    .AddItems([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    .SetBatchSize(5)
+    .OnBatch((batch) => OutputDebug("Processing batch of " . batch.Length))
+
+; Queue processor
+class Queue {
+    _items := []
+    _processing := false
+    _onProcess := ""
+
+    Enqueue(item) {
+        this._items.Push(item)
+        this._ProcessNext()
+        return this
+    }
+
+    OnProcess(handler) {
+        this._onProcess := handler
+        return this
+    }
+
+    _ProcessNext() {
+        if (this._processing || this._items.Length = 0)
+            return
+
+        this._processing := true
+        item := this._items.RemoveAt(1)
+
+        if (this._onProcess) {
+            this._onProcess(item)
+        }
+
+        this._processing := false
+        this._ProcessNext()  ; Process next item
+    }
+
+    GetSize() {
+        return this._items.Length
+    }
+}
+
+queue := Queue()
+    .OnProcess((item) => (
+        OutputDebug("Processing: " . item),
+        Sleep(100)
+    ))
+
+queue.Enqueue("Task 1")
+queue.Enqueue("Task 2")
+queue.Enqueue("Task 3")

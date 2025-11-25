@@ -1,0 +1,286 @@
+; Advanced GUI Layout System with Responsive Design
+; Demonstrates flexible layouts, auto-sizing, and responsive behavior
+
+class LayoutEngine {
+    _columns := 1
+    _rows := []
+    _currentRow := []
+    _columnWidth := 0
+    _rowHeight := 0
+
+    __New(columns := 1, columnWidth := 0, rowHeight := 0) {
+        this._columns := columns
+        this._columnWidth := columnWidth
+        this._rowHeight := rowHeight
+    }
+
+    AddControl(name, options := "") {
+        if (this._currentRow.Length >= this._columns) {
+            this._rows.Push(this._currentRow.Clone())
+            this._currentRow := []
+        }
+
+        this._currentRow.Push({name, options})
+        return this
+    }
+
+    NewRow() {
+        if (this._currentRow.Length > 0) {
+            this._rows.Push(this._currentRow.Clone())
+            this._currentRow := []
+        }
+        return this
+    }
+
+    GetLayout() {
+        rows := this._rows.Clone()
+        if (this._currentRow.Length > 0) {
+            rows.Push(this._currentRow)
+        }
+        return rows
+    }
+
+    Render() {
+        layout := this.GetLayout()
+        xPos := 10
+        yPos := 10
+        output := ""
+
+        for row in layout {
+            for control in row {
+                width := this._columnWidth > 0 ? this._columnWidth : 100
+                height := this._rowHeight > 0 ? this._rowHeight : 30
+
+                output .= control.name . " at (" . xPos . "," . yPos . ")`n"
+                xPos += width + 10
+            }
+            xPos := 10
+            yPos += (this._rowHeight > 0 ? this._rowHeight : 30) + 10
+        }
+
+        return output
+    }
+}
+
+layout := LayoutEngine(2, 150, 30)
+layout.AddControl("Button1")
+layout.AddControl("Button2")
+layout.NewRow()
+layout.AddControl("Button3")
+layout.AddControl("Button4")
+
+MsgBox(layout.Render())
+
+; Flexbox-like layout
+class FlexLayout {
+    _items := []
+    _direction := "row"  ; row or column
+    _justifyContent := "flex-start"  ; flex-start, center, space-between
+    _alignItems := "stretch"  ; stretch, center, flex-start
+    _gap := 10
+
+    __New(direction := "row") {
+        this._direction := direction
+    }
+
+    AddItem(item, flex := 1) {
+        this._items.Push({item, flex})
+        return this
+    }
+
+    SetJustify(justify) {
+        this._justifyContent := justify
+        return this
+    }
+
+    SetAlign(align) {
+        this._alignItems := align
+        return this
+    }
+
+    SetGap(gap) {
+        this._gap := gap
+        return this
+    }
+
+    GetItems() {
+        return this._items
+    }
+
+    CalculateLayout(containerSize) {
+        totalFlex := 0
+        for item in this._items {
+            totalFlex += item.flex
+        }
+
+        availableSpace := containerSize - (this._items.Length - 1) * this._gap
+        baseSize := availableSpace / totalFlex
+
+        layout := []
+        position := 0
+
+        for item in this._items {
+            itemSize := baseSize * item.flex
+            layout.Push({item: item.item, position, size: itemSize})
+            position += itemSize + this._gap
+        }
+
+        return layout
+    }
+}
+
+flex := FlexLayout("row")
+    .AddItem("Header", 1)
+    .AddItem("Main", 2)
+    .AddItem("Sidebar", 1)
+    .SetGap(10)
+
+MsgBox("Flex items: " . flex.GetItems().Length)
+
+; Grid layout system
+class GridLayout {
+    _columns := 3
+    _rows := 3
+    _cells := Map()
+    _columnSizes := []
+    _rowSizes := []
+
+    __New(columns, rows) {
+        this._columns := columns
+        this._rows := rows
+
+        loop columns
+            this._columnSizes.Push(1)
+        loop rows
+            this._rowSizes.Push(1)
+    }
+
+    Place(row, col, content, colSpan := 1, rowSpan := 1) {
+        key := row . "," . col
+        this._cells[key] := {content, colSpan, rowSpan}
+        return this
+    }
+
+    SetColumnSize(col, size) {
+        if (col <= this._columns)
+            this._columnSizes[col] := size
+        return this
+    }
+
+    GetCell(row, col) {
+        key := row . "," . col
+        return this._cells.Has(key) ? this._cells[key] : ""
+    }
+
+    GetLayout() {
+        grid := Map()
+        for key, cell in this._cells {
+            grid[key] := cell
+        }
+        return grid
+    }
+}
+
+grid := GridLayout(3, 3)
+grid.Place(1, 1, "Header", 3, 1)
+grid.Place(2, 1, "Sidebar", 1, 2)
+grid.Place(2, 2, "Main", 2, 2)
+
+MsgBox("Grid size: " . grid._columns . "x" . grid._rows)
+
+; Responsive layout
+class ResponsiveLayout {
+    _layouts := Map()
+    _currentBreakpoint := "desktop"
+
+    AddLayout(breakpoint, layout) {
+        this._layouts[breakpoint] := layout
+        return this
+    }
+
+    GetLayout(breakpoint) {
+        return this._layouts.Has(breakpoint) ?
+            this._layouts[breakpoint] : ""
+    }
+
+    SetBreakpoint(breakpoint) {
+        this._currentBreakpoint := breakpoint
+        return this
+    }
+
+    GetCurrentLayout() {
+        return this.GetLayout(this._currentBreakpoint)
+    }
+
+    GetBreakpointForWidth(width) {
+        if (width <= 480)
+            return "mobile"
+        if (width <= 768)
+            return "tablet"
+        return "desktop"
+    }
+}
+
+responsive := ResponsiveLayout()
+    .AddLayout("mobile", "Single column layout")
+    .AddLayout("tablet", "Two column layout")
+    .AddLayout("desktop", "Three column layout")
+
+MsgBox(responsive.GetLayout("mobile"))
+
+; Stack layout (vertically stacked items)
+class StackLayout {
+    _items := []
+    _spacing := 10
+    _alignment := "left"
+
+    AddItem(item, size := "auto") {
+        this._items.Push({item, size})
+        return this
+    }
+
+    SetSpacing(spacing) {
+        this._spacing := spacing
+        return this
+    }
+
+    SetAlignment(alignment) {
+        this._alignment := alignment
+        return this
+    }
+
+    CalculatePositions(containerWidth, containerHeight) {
+        positions := []
+        yPos := 10
+        autoItems := 0
+        fixedHeight := 0
+
+        for item in this._items {
+            if (item.size = "auto") {
+                autoItems++
+            } else {
+                fixedHeight += item.size
+            }
+        }
+
+        autoHeight := (containerHeight - fixedHeight -
+            (this._items.Length - 1) * this._spacing - 20) / autoItems
+
+        for item in this._items {
+            itemHeight := item.size = "auto" ? autoHeight : item.size
+            positions.Push({x: 10, y: yPos, width: containerWidth - 20, height: itemHeight})
+            yPos += itemHeight + this._spacing
+        }
+
+        return positions
+    }
+}
+
+stack := StackLayout()
+    .AddItem("Header", 60)
+    .AddItem("Content", "auto")
+    .AddItem("Footer", 40)
+    .SetSpacing(5)
+
+positions := stack.CalculatePositions(800, 600)
+MsgBox("Stack layout calculated: " . positions.Length . " items")

@@ -1,0 +1,286 @@
+; Advanced Configuration and Settings Management
+; Demonstrates INI file handling, configuration caching, and settings serialization
+
+class ConfigManager {
+    _settings := Map()
+    _filePath := ""
+    _autoSave := true
+    _defaults := Map()
+
+    __New(filePath, autoSave := true) {
+        this._filePath := filePath
+        this._autoSave := autoSave
+        this.Load()
+    }
+
+    Load() {
+        if (!FileExist(this._filePath))
+            return false
+
+        try {
+            content := FileRead(this._filePath)
+            lines := StrSplit(content, "`n")
+            currentSection := "default"
+
+            for line in lines {
+                line := StrTrim(line)
+
+                if (line = "" || SubStr(line, 1, 1) = ";")
+                    continue
+
+                if (SubStr(line, 1, 1) = "[" && SubStr(line, -1) = "]") {
+                    currentSection := SubStr(line, 2, StrLen(line) - 2)
+                    if (!this._settings.Has(currentSection))
+                        this._settings[currentSection] := Map()
+                    continue
+                }
+
+                eqPos := InStr(line, "=")
+                if (eqPos > 0) {
+                    key := StrTrim(SubStr(line, 1, eqPos - 1))
+                    value := StrTrim(SubStr(line, eqPos + 1))
+
+                    if (!this._settings.Has(currentSection))
+                        this._settings[currentSection] := Map()
+
+                    this._settings[currentSection][key] := value
+                }
+            }
+
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    Save() {
+        try {
+            content := ""
+
+            for section, settings in this._settings {
+                content .= "[" . section . "]`n"
+
+                for key, value in settings {
+                    content .= key . "=" . value . "`n"
+                }
+
+                content .= "`n"
+            }
+
+            FileDelete(this._filePath)
+            FileAppend(content, this._filePath)
+
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    Get(section, key, default := "") {
+        if (this._settings.Has(section) && this._settings[section].Has(key)) {
+            return this._settings[section][key]
+        }
+
+        return default
+    }
+
+    Set(section, key, value) {
+        if (!this._settings.Has(section))
+            this._settings[section] := Map()
+
+        this._settings[section][key] := value
+
+        if (this._autoSave)
+            this.Save()
+
+        return this
+    }
+
+    GetSection(section) {
+        return this._settings.Has(section) ? this._settings[section] : Map()
+    }
+
+    SetDefault(section, key, value) {
+        if (!this._defaults.Has(section))
+            this._defaults[section] := Map()
+
+        this._defaults[section][key] := value
+
+        if (!this.Get(section, key)) {
+            this.Set(section, key, value)
+        }
+
+        return this
+    }
+
+    Clear() {
+        this._settings := Map()
+        return this
+    }
+
+    Reset() {
+        this.Clear()
+        return this.ApplyDefaults()
+    }
+
+    ApplyDefaults() {
+        for section, settings in this._defaults {
+            for key, value in settings {
+                if (!this.Get(section, key)) {
+                    this.Set(section, key, value)
+                }
+            }
+        }
+
+        return this
+    }
+}
+
+; Create and test config
+config := ConfigManager(A_ScriptDir . "\settings.ini")
+config.SetDefault("app", "name", "MyApp")
+config.SetDefault("app", "version", "1.0")
+config.Set("app", "name", "MyApp")
+config.Set("app", "version", "1.0")
+
+; Preferences handler
+class PreferenceManager {
+    _config := ""
+    _section := "preferences"
+
+    __New(configManager, section := "preferences") {
+        this._config := configManager
+        this._section := section
+    }
+
+    Set(key, value) {
+        this._config.Set(this._section, key, value)
+        return this
+    }
+
+    Get(key, default := "") {
+        return this._config.Get(this._section, key, default)
+    }
+
+    GetAll() {
+        return this._config.GetSection(this._section)
+    }
+
+    SetInt(key, value) {
+        this.Set(key, String(value))
+        return this
+    }
+
+    GetInt(key, default := 0) {
+        val := this.Get(key, "")
+        return val != "" ? val + 0 : default
+    }
+
+    SetBool(key, value) {
+        this.Set(key, value ? "true" : "false")
+        return this
+    }
+
+    GetBool(key, default := false) {
+        val := this.Get(key, "")
+        if (val = "")
+            return default
+        return StrLower(val) = "true"
+    }
+}
+
+prefs := PreferenceManager(config)
+prefs.SetBool("darkMode", true)
+prefs.SetInt("fontSize", 12)
+
+MsgBox("Dark mode: " . (prefs.GetBool("darkMode") ? "ON" : "OFF"))
+
+; JSON-like settings
+class JSONSettings {
+    _data := Map()
+    _filePath := ""
+
+    __New(filePath) {
+        this._filePath := filePath
+        this.Load()
+    }
+
+    Load() {
+        if (!FileExist(this._filePath))
+            return false
+
+        try {
+            content := FileRead(this._filePath)
+            ; Simple JSON parsing (simplified)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    Save() {
+        try {
+            content := this._SerializeMap(this._data)
+            FileDelete(this._filePath)
+            FileAppend(content, this._filePath)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    Set(path, value) {
+        parts := StrSplit(path, ".")
+        current := this._data
+
+        loop (parts.Length - 1) {
+            key := parts[A_Index]
+            if (!current.Has(key))
+                current[key] := Map()
+            current := current[key]
+        }
+
+        current[parts[parts.Length]] := value
+        return this
+    }
+
+    Get(path, default := "") {
+        parts := StrSplit(path, ".")
+        current := this._data
+
+        for key in parts {
+            if (Type(current) = "Map" && current.Has(key)) {
+                current := current[key]
+            } else {
+                return default
+            }
+        }
+
+        return current
+    }
+
+    _SerializeMap(map) {
+        output := "{"
+        first := true
+
+        for key, value in map {
+            if (!first)
+                output .= ","
+
+            output .= """" . key . """:"
+
+            if (Type(value) = "Map") {
+                output .= this._SerializeMap(value)
+            } else if (Type(value) = "String") {
+                output .= """" . value . """"
+            } else {
+                output .= value
+            }
+
+            first := false
+        }
+
+        output .= "}"
+        return output
+    }
+}

@@ -1,0 +1,193 @@
+; Advanced Hotkey System with Bindings and Contexts
+; Demonstrates dynamic hotkey management, bindings, and context switching
+
+class HotkeyManager {
+    _hotkeys := Map()
+    _enabled := true
+    _context := "global"
+
+    Register(key, action, context := "global") {
+        contextMap := this._hotkeys.Has(context) ? this._hotkeys[context] : Map()
+        contextMap[key] := action
+        this._hotkeys[context] := contextMap
+    }
+
+    Unregister(key, context := "global") {
+        if (this._hotkeys.Has(context)) {
+            this._hotkeys[context].Delete(key)
+        }
+    }
+
+    SetContext(context) {
+        this._context := context
+    }
+
+    GetContext() {
+        return this._context
+    }
+
+    Enable() {
+        this._enabled := true
+    }
+
+    Disable() {
+        this._enabled := false
+    }
+
+    Execute(key) {
+        if (!this._enabled)
+            return
+
+        contextMap := this._hotkeys.Has(this._context) ?
+            this._hotkeys[this._context] : Map()
+
+        globalMap := this._hotkeys.Has("global") ?
+            this._hotkeys["global"] : Map()
+
+        if (contextMap.Has(key)) {
+            return contextMap[key]()
+        } else if (globalMap.Has(key)) {
+            return globalMap[key]()
+        }
+    }
+}
+
+hm := HotkeyManager()
+
+; Register global hotkeys
+hm.Register("!+e", () => (
+    OutputDebug("Global: Alt+Shift+E pressed"),
+    "Global action"
+))
+
+; Register context-specific hotkeys
+hm.Register("!+e", () => (
+    OutputDebug("Editor: Alt+Shift+E pressed"),
+    "Editor action"
+), "editor")
+
+hm.Register("!+s", () => (
+    OutputDebug("Editor: Save pressed"),
+    "Save"
+), "editor")
+
+; Simulate hotkey execution
+hm.Execute("!+e")  ; Uses global context
+hm.SetContext("editor")
+hm.Execute("!+e")  ; Uses editor context
+hm.Execute("!+s")  ; Editor-specific
+
+; Chord hotkey system (multi-key sequences)
+class ChordRecognizer {
+    _sequence := []
+    _timeout := 500
+    _lastKeyTime := 0
+    _handlers := Map()
+    _timerId := ""
+
+    Register(sequence, handler) {
+        key := StrJoin(",", sequence)
+        this._handlers[key] := handler
+    }
+
+    RecordKey(key) {
+        now := A_TickCount
+
+        if (this._lastKeyTime && now - this._lastKeyTime > this._timeout) {
+            this._sequence := []
+        }
+
+        this._sequence.Push(key)
+        this._lastKeyTime := now
+
+        this._CheckChord()
+    }
+
+    _CheckChord() {
+        seqStr := StrJoin(",", this._sequence)
+
+        for pattern, handler in this._handlers {
+            if (InStr(pattern, seqStr)) {
+                if (pattern = seqStr) {
+                    handler()
+                    this._sequence := []
+                }
+            }
+        }
+    }
+}
+
+StrJoin(separator, arr) {
+    result := ""
+    for item in arr {
+        result .= (result ? separator : "") . item
+    }
+    return result
+}
+
+chord := ChordRecognizer()
+chord.Register(["a", "b"], () => OutputDebug("Chord: A+B pressed"))
+chord.Register(["a", "c"], () => OutputDebug("Chord: A+C pressed"))
+
+; Simulate chord detection
+chord.RecordKey("a")
+chord.RecordKey("b")  ; Triggers handler
+
+; Debounced hotkey (ignore rapid repeats)
+DebounceHotkey(fn, delay := 200) {
+    lastTime := 0
+
+    return () => {
+        now := A_TickCount
+        if (now - lastTime >= delay) {
+            fn()
+            lastTime := now
+        }
+    }
+}
+
+rapidCounter := 0
+debouncedHandler := DebounceHotkey(
+    () => (rapidCounter++, MsgBox("Action #" . rapidCounter)),
+    200
+)
+
+loop 5 {
+    debouncedHandler()
+    Sleep(50)  ; Rapid calls
+}
+
+; Conditional hotkey with modifiers
+class ModifierChecker {
+    IsPressed(key) {
+        switch key {
+            case "ctrl":
+            case "lctrl":
+            case "rctrl":
+                return GetKeyState("LCtrl") || GetKeyState("RCtrl")
+            case "shift":
+            case "lshift":
+            case "rshift":
+                return GetKeyState("LShift") || GetKeyState("RShift")
+            case "alt":
+            case "lalt":
+            case "ralt":
+                return GetKeyState("LAlt") || GetKeyState("RAlt")
+        }
+        return false
+    }
+
+    GetModifiers() {
+        mods := []
+        if (this.IsPressed("ctrl"))
+            mods.Push("Ctrl")
+        if (this.IsPressed("shift"))
+            mods.Push("Shift")
+        if (this.IsPressed("alt"))
+            mods.Push("Alt")
+        return mods
+    }
+}
+
+checker := ModifierChecker()
+MsgBox("Current modifiers: " . StrJoin("+", checker.GetModifiers()))

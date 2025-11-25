@@ -1,0 +1,288 @@
+; Advanced Clipboard Monitoring and Manipulation
+; Demonstrates clipboard tracking, filtering, and history management
+
+class ClipboardMonitor {
+    _lastContent := ""
+    _monitoringActive := false
+    _onClipboardChange := ""
+    _timerId := ""
+    _history := []
+    _maxHistorySize := 100
+
+    Start(checkIntervalMs := 500) {
+        this._monitoringActive := true
+
+        this._timerId := SetTimer(() => {
+            currentContent := A_Clipboard
+
+            if (currentContent != this._lastContent) {
+                this._lastContent := currentContent
+                this._AddToHistory(currentContent)
+
+                if (this._onClipboardChange)
+                    this._onClipboardChange(currentContent)
+            }
+        }, checkIntervalMs)
+
+        return this
+    }
+
+    Stop() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+        this._monitoringActive := false
+        return this
+    }
+
+    OnChange(handler) {
+        this._onClipboardChange := handler
+        return this
+    }
+
+    _AddToHistory(content) {
+        this._history.Push({
+            content: content,
+            timestamp: A_Now
+        })
+
+        if (this._history.Length > this._maxHistorySize) {
+            this._history.RemoveAt(1)
+        }
+    }
+
+    GetHistory() {
+        return this._history.Clone()
+    }
+
+    GetHistoryItem(index) {
+        if (index > 0 && index <= this._history.Length) {
+            return this._history[index]
+        }
+        return ""
+    }
+
+    ClearHistory() {
+        this._history := []
+        return this
+    }
+
+    SetContent(content) {
+        A_Clipboard := content
+        this._lastContent := content
+        this._AddToHistory(content)
+        return this
+    }
+
+    GetContent() {
+        return A_Clipboard
+    }
+}
+
+clipMon := ClipboardMonitor()
+clipMon.OnChange((content) => OutputDebug("Clipboard: " . SubStr(content, 1, 50)))
+clipMon.Start(500)
+
+; Clipboard filter
+class ClipboardFilter {
+    _filters := []
+    _transformers := []
+
+    AddFilter(predicate) {
+        this._filters.Push(predicate)
+        return this
+    }
+
+    AddTransformer(transformer) {
+        this._transformers.Push(transformer)
+        return this
+    }
+
+    Process(content) {
+        ; Apply filters
+        for filter in this._filters {
+            if (!filter(content))
+                return content
+        }
+
+        ; Apply transformers
+        for transformer in this._transformers {
+            content := transformer(content)
+        }
+
+        return content
+    }
+}
+
+clipFilter := ClipboardFilter()
+    .AddFilter((c) => StrLen(c) > 0)
+    .AddTransformer((c) => StrTrim(c))
+    .AddTransformer((c) => StrUpper(c))
+
+processed := clipFilter.Process("  hello world  ")
+MsgBox(processed)  ; HELLO WORLD
+
+; Clipboard manager with collections
+class ClipboardManager {
+    _collections := Map()
+    _currentCollection := "default"
+
+    CreateCollection(name) {
+        this._collections[name] := []
+        return this
+    }
+
+    SetCurrentCollection(name) {
+        if (this._collections.Has(name)) {
+            this._currentCollection := name
+        }
+        return this
+    }
+
+    SaveClipboard(label := "") {
+        content := A_Clipboard
+        timestamp := A_Now
+
+        if (!this._collections.Has(this._currentCollection)) {
+            this.CreateCollection(this._currentCollection)
+        }
+
+        this._collections[this._currentCollection].Push({
+            content,
+            label,
+            timestamp
+        })
+
+        return this
+    }
+
+    PasteFromCollection(index) {
+        collection := this._collections[this._currentCollection]
+
+        if (index > 0 && index <= collection.Length) {
+            A_Clipboard := collection[index].content
+        }
+
+        return this
+    }
+
+    ListCollection() {
+        collection := this._collections[this._currentCollection]
+        return collection
+    }
+
+    GetCollections() {
+        result := []
+        for name in this._collections {
+            result.Push(name)
+        }
+        return result
+    }
+}
+
+clipMgr := ClipboardManager()
+clipMgr.CreateCollection("work")
+clipMgr.CreateCollection("personal")
+
+; Clipboard search
+class ClipboardSearcher {
+    _history := []
+
+    AddToHistory(content) {
+        this._history.Push(content)
+        return this
+    }
+
+    SearchText(query) {
+        results := []
+        lowerQuery := StrLower(query)
+
+        for item in this._history {
+            if (InStr(StrLower(item), lowerQuery)) {
+                results.Push(item)
+            }
+        }
+
+        return results
+    }
+
+    SearchRegex(pattern) {
+        results := []
+
+        for item in this._history {
+            if (RegExMatch(item, pattern)) {
+                results.Push(item)
+            }
+        }
+
+        return results
+    }
+
+    SearchLength(minLen, maxLen := Infinity) {
+        results := []
+
+        for item in this._history {
+            len := StrLen(item)
+            if (len >= minLen && len <= maxLen) {
+                results.Push(item)
+            }
+        }
+
+        return results
+    }
+}
+
+searcher := ClipboardSearcher()
+searcher.AddToHistory("Hello world")
+searcher.AddToHistory("Hello there")
+searcher.AddToHistory("Test 123")
+
+found := searcher.SearchText("hello")
+MsgBox("Found " . found.Length . " items containing 'hello'")
+
+; Clipboard formatter
+class ClipboardFormatter {
+    static ToUpperCase(text) => StrUpper(text)
+
+    static ToLowerCase(text) => StrLower(text)
+
+    static ToPascalCase(text) {
+        words := StrSplit(StrTrim(text), " ")
+        result := ""
+        for word in words {
+            result .= SubStr(word, 1, 1) . StrLower(SubStr(word, 2))
+        }
+        return result
+    }
+
+    static ToCamelCase(text) {
+        words := StrSplit(StrTrim(text), " ")
+        result := StrLower(words[1])
+        loop (words.Length - 1) {
+            word := words[A_Index + 1]
+            result .= SubStr(word, 1, 1) . StrLower(SubStr(word, 2))
+        }
+        return result
+    }
+
+    static ToSnakeCase(text) {
+        return StrLower(StrReplace(StrTrim(text), " ", "_"))
+    }
+
+    static ToKebabCase(text) {
+        return StrLower(StrReplace(StrTrim(text), " ", "-"))
+    }
+
+    static RemoveWhitespace(text) {
+        return StrReplace(text, A_Space, "")
+    }
+
+    static TrimWhitespace(text) {
+        return StrTrim(text)
+    }
+}
+
+original := "hello world test"
+MsgBox(ClipboardFormatter.ToPascalCase(original))  ; HelloWorldTest
+MsgBox(ClipboardFormatter.ToSnakeCase(original))   ; hello_world_test
+MsgBox(ClipboardFormatter.ToKebabCase(original))   ; hello-world-test

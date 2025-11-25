@@ -1,0 +1,226 @@
+; Advanced GUI Framework with Event Handling
+; Demonstrates reusable GUI components and event management
+
+class UIComponent {
+    _type := ""
+    _id := ""
+    _parent := ""
+    _properties := Map()
+    _eventHandlers := Map()
+
+    __New(type, id, parent := "") {
+        this._type := type
+        this._id := id
+        this._parent := parent
+    }
+
+    SetProperty(name, value) {
+        this._properties[name] := value
+        return this
+    }
+
+    GetProperty(name, default := "") {
+        return this._properties.Has(name) ? this._properties[name] : default
+    }
+
+    On(event, handler) {
+        if (!this._eventHandlers.Has(event))
+            this._eventHandlers[event] := []
+        this._eventHandlers[event].Push(handler)
+        return this
+    }
+
+    Trigger(event, data := "") {
+        if (this._eventHandlers.Has(event)) {
+            for handler in this._eventHandlers[event] {
+                handler(data)
+            }
+        }
+    }
+
+    Render() {
+        return ""
+    }
+}
+
+class Button extends UIComponent {
+    __New(id, label := "Button", parent := "") {
+        super.__New("button", id, parent)
+        this.SetProperty("label", label)
+    }
+
+    Click() {
+        this.Trigger("click")
+    }
+}
+
+class TextInput extends UIComponent {
+    __New(id, placeholder := "", parent := "") {
+        super.__New("textinput", id, parent)
+        this.SetProperty("placeholder", placeholder)
+        this.SetProperty("value", "")
+    }
+
+    GetValue() {
+        return this.GetProperty("value")
+    }
+
+    SetValue(value) {
+        this.SetProperty("value", value)
+        this.Trigger("change", value)
+    }
+}
+
+class Form {
+    _components := []
+    _guiNum := 1
+
+    Add(component) {
+        this._components.Push(component)
+        return this
+    }
+
+    OnSubmit(handler) {
+        for comp in this._components {
+            if (comp._type = "button" && comp.GetProperty("label") = "Submit") {
+                comp.On("click", handler)
+            }
+        }
+        return this
+    }
+
+    Build() {
+        GuiNew(this._guiNum)
+
+        yPos := 10
+        for comp in this._components {
+            if (comp._type = "textinput") {
+                Gui Add, Edit, x10 y%yPos% w300 h30 v%comp._id%,
+                yPos += 40
+            } else if (comp._type = "button") {
+                label := comp.GetProperty("label")
+                Gui Add, Button, x10 y%yPos% w100 h30 v%comp._id%, %label%
+                yPos += 40
+            }
+        }
+
+        Gui Show, w320 h%yPos%, Form
+        return this._guiNum
+    }
+}
+
+; Usage
+form := Form()
+form.Add(TextInput("name", "Enter name"))
+form.Add(TextInput("email", "Enter email"))
+form.Add(Button("submit", "Submit"))
+
+form.OnSubmit(() => MsgBox("Form submitted!"))
+
+guiNum := form.Build()
+
+; Modal dialog builder
+class Dialog {
+    _title := ""
+    _message := ""
+    _buttons := []
+    _callback := ""
+
+    __New(title, message) {
+        this._title := title
+        this._message := message
+    }
+
+    AddButton(label, value := "") {
+        this._buttons.Push({label, value: (value = "" ? label : value)})
+        return this
+    }
+
+    Show(callback := "") {
+        this._callback := callback
+
+        GuiNew()
+        Gui Add, Text, x10 y10 w380 h60, %this._message%
+
+        yPos := 80
+        for btn in this._buttons {
+            Gui Add, Button, x10 y%yPos% w80 h30 v%btn.value%, %btn.label%
+            yPos += 40
+        }
+
+        Gui Show, w400 h%yPos%, %this._title%
+        return true
+    }
+}
+
+; Advanced layout manager
+class LayoutManager {
+    _grid := []
+    _rows := 0
+    _cols := 0
+
+    __New(rows, cols) {
+        this._rows := rows
+        this._cols := cols
+
+        loop rows {
+            row := []
+            loop cols {
+                row.Push("")
+            }
+            this._grid.Push(row)
+        }
+    }
+
+    Place(row, col, content) {
+        if (row <= this._rows && col <= this._cols) {
+            this._grid[row][col] := content
+        }
+        return this
+    }
+
+    Render() {
+        output := ""
+        for row in this._grid {
+            for col in row {
+                output .= col . " | "
+            }
+            output .= "`n"
+        }
+        return output
+    }
+}
+
+; Data binding for GUI
+class DataBinding {
+    _data := Map()
+    _bindings := Map()
+
+    SetData(key, value) {
+        this._data[key] := value
+        if (this._bindings.Has(key)) {
+            for binding in this._bindings[key] {
+                binding(value)
+            }
+        }
+    }
+
+    Bind(key, updateFn) {
+        if (!this._bindings.Has(key))
+            this._bindings[key] := []
+        this._bindings[key].Push(updateFn)
+    }
+
+    GetData(key, default := "") {
+        return this._data.Has(key) ? this._data[key] : default
+    }
+}
+
+binding := DataBinding()
+
+binding.Bind("username", (value) => (
+    OutputDebug("Username changed to: " . value)
+))
+
+binding.SetData("username", "alice")
+binding.SetData("username", "bob")

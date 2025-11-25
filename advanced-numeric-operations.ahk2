@@ -1,0 +1,68 @@
+; Advanced Numeric Operations and Precision Handling
+; Demonstrates numeric edge cases, bitwise operations, and scientific computing
+
+; Floating point precision
+a := 0.1 + 0.2
+b := 0.3
+MsgBox("0.1 + 0.2 = " . a . " (equals 0.3? " . (Abs(a - b) < 0.0001) . ")")
+
+; Safe comparison with epsilon
+SafeEqual(a, b, epsilon := 1e-10) {
+    return Abs(a - b) < epsilon
+}
+
+MsgBox(SafeEqual(0.1 + 0.2, 0.3) . " (using epsilon comparison)")
+
+; Bitwise operations
+num1 := 5      ; 0101 in binary
+num2 := 3      ; 0011 in binary
+
+BitwiseAnd(a, b) {
+    result := 0
+    bit := 1
+    while (bit <= a || bit <= b) {
+        if (a & bit) && (b & bit)
+            result |= bit
+        bit *= 2
+    }
+    return result
+}
+
+MsgBox("5 & 3 = " . BitwiseAnd(num1, num2))  ; Should be 1
+
+; Numeric formatting with precision
+FormatNumber(num, decimals := 2, separator := ",") {
+    formatted := Format("{:." . decimals . "f}", num)
+    parts := StrSplit(formatted, ".")
+    intPart := parts[1]
+    decPart := parts.Length > 1 ? "." . parts[2] : ""
+
+    ; Add thousands separator
+    result := ""
+    loop Parse intPart {
+        result := A_LoopField . result
+        if (A_Index mod 3 = 0 && A_Index < StrLen(intPart))
+            result := separator . result
+    }
+
+    return result . decPart
+}
+
+MsgBox(FormatNumber(1234567.89))  ; 1,234,567.89
+
+; Range validation with clamping
+Clamp(value, min, max) {
+    return value < min ? min : (value > max ? max : value)
+}
+
+MsgBox(Clamp(15, 0, 10))  ; 10
+MsgBox(Clamp(-5, 0, 10))  ; 0
+
+; Trigonometric angle normalization
+NormalizeAngle(angle) {
+    angle := Mod(angle, 360)
+    return angle < 0 ? angle + 360 : angle
+}
+
+MsgBox(NormalizeAngle(450))   ; 90
+MsgBox(NormalizeAngle(-90))   ; 270

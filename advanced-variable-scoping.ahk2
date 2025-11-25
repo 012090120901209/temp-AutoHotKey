@@ -1,0 +1,64 @@
+; Advanced Variable Scoping and Closure Patterns
+; Demonstrates scope hierarchy, shadowing, and closure data capture
+
+global globalVar := "I'm global"
+
+TestVariableScoping() {
+    local localVar := "I'm local"
+    static staticVar := "I'm persistent across calls"
+
+    ; Accessing outer scope
+    MsgBox("Global: " . globalVar)
+    MsgBox("Local: " . localVar)
+    MsgBox("Static: " . staticVar)
+
+    staticVar++  ; Increment persists across calls
+}
+
+TestVariableScoping()
+TestVariableScoping()  ; Static var is now incremented
+
+; Variable shadowing - local hides global
+globalVar := "outer"
+
+TestShadowing() {
+    global globalVar
+    globalVar := "modified in function"
+    MsgBox(globalVar)  ; "modified in function"
+}
+
+TestShadowing()
+
+; Closure pattern - capturing variables
+CreateCounter(start := 0) {
+    counter := start
+
+    return () {
+        counter++
+        return counter
+    }
+}
+
+counter1 := CreateCounter(0)
+counter2 := CreateCounter(100)
+
+MsgBox(counter1() . ", " . counter1() . ", " . counter1())  ; 1, 2, 3
+MsgBox(counter2() . ", " . counter2())  ; 101, 102
+
+; Lazy evaluation with closures
+LazyValue(func) {
+    computed := false
+    cachedValue := ""
+
+    return () {
+        if (!computed) {
+            cachedValue := func()
+            computed := true
+        }
+        return cachedValue
+    }
+}
+
+expensive := LazyValue(() => (Sleep(1000), "computed!"))
+MsgBox(expensive())  ; First call: slow
+MsgBox(expensive())  ; Second call: instant (cached)

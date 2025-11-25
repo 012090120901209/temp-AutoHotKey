@@ -1,0 +1,295 @@
+; Advanced Asynchronous Patterns and Event-Driven Programming
+; Demonstrates callbacks, event loops, and async-like behaviors
+
+class AsyncTask {
+    _task := ""
+    _delay := 0
+    _callback := ""
+    _errorHandler := ""
+    _timerId := ""
+
+    Execute(taskFn, delayMs := 0, callback := "", errorHandler := "") {
+        this._task := taskFn
+        this._delay := delayMs
+        this._callback := callback
+        this._errorHandler := errorHandler
+
+        if (delayMs > 0) {
+            this._timerId := SetTimer(() => this._Run(), delayMs, 1)
+        } else {
+            this._Run()
+        }
+
+        return this
+    }
+
+    _Run() {
+        try {
+            result := this._task()
+
+            if (this._callback)
+                this._callback(result)
+        } catch Error as e {
+            if (this._errorHandler)
+                this._errorHandler(e.Message)
+        }
+    }
+
+    Cancel() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+        return this
+    }
+}
+
+task := AsyncTask()
+task.Execute(
+    () => "Task complete!",
+    1000,
+    (result) => MsgBox(result),
+    (error) => MsgBox("Error: " . error)
+)
+
+; Event emitter with async support
+class EventEmitter {
+    _events := Map()
+    _maxListeners := 10
+    _asyncMode := false
+
+    On(event, handler) {
+        if (!this._events.Has(event))
+            this._events[event] := []
+
+        this._events[event].Push(handler)
+        return this
+    }
+
+    Once(event, handler) {
+        wrappedHandler := (args*) => (
+            handler(args*),
+            this.Off(event, wrappedHandler)
+        )
+
+        this.On(event, wrappedHandler)
+        return this
+    }
+
+    Off(event, handler) {
+        if (this._events.Has(event)) {
+            listeners := this._events[event]
+            for idx, h in listeners {
+                if (h = handler) {
+                    listeners.RemoveAt(idx)
+                    break
+                }
+            }
+        }
+        return this
+    }
+
+    Emit(event, data := "") {
+        if (!this._events.Has(event))
+            return this
+
+        if (this._asyncMode) {
+            SetTimer(() => this._EmitSync(event, data), -1)
+        } else {
+            this._EmitSync(event, data)
+        }
+
+        return this
+    }
+
+    _EmitSync(event, data) {
+        if (this._events.Has(event)) {
+            for handler in this._events[event] {
+                try {
+                    handler(data)
+                } catch Error as e {
+                    OutputDebug("Event handler error: " . e.Message)
+                }
+            }
+        }
+    }
+
+    SetAsyncMode(async := true) {
+        this._asyncMode := async
+        return this
+    }
+
+    GetListenerCount(event) {
+        return this._events.Has(event) ? this._events[event].Length : 0
+    }
+}
+
+emitter := EventEmitter()
+emitter.On("data", (msg) => OutputDebug("Received: " . msg))
+emitter.Emit("data", "Hello!")
+
+; Debouncer for event handling
+class Debouncer {
+    _timerId := ""
+    _delay := 300
+    _fn := ""
+
+    __New(fn, delay := 300) {
+        this._fn := fn
+        this._delay := delay
+    }
+
+    Call(args*) {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+
+        this._timerId := SetTimer(() => this._Execute(args), this._delay, 1)
+    }
+
+    _Execute(args) {
+        this._fn(args*)
+    }
+
+    Cancel() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+        return this
+    }
+}
+
+; Throttler for limiting execution
+class Throttler {
+    _fn := ""
+    _delay := 300
+    _lastTime := 0
+
+    __New(fn, delay := 300) {
+        this._fn := fn
+        this._delay := delay
+        this._lastTime := 0
+    }
+
+    Call(args*) {
+        now := A_TickCount
+
+        if (now - this._lastTime >= this._delay) {
+            this._fn(args*)
+            this._lastTime := now
+        }
+    }
+}
+
+; Promise-like chaining
+class Chain {
+    _operations := []
+
+    Then(fn) {
+        this._operations.Push(fn)
+        return this
+    }
+
+    Execute(initialValue := "") {
+        result := initialValue
+
+        for operation in this._operations {
+            result := operation(result)
+        }
+
+        return result
+    }
+}
+
+chain := Chain()
+    .Then((x) => x + 10)
+    .Then((x) => x * 2)
+    .Then((x) => "Result: " . x)
+
+MsgBox(chain.Execute(5))  ; Result: 30
+
+; Batch execution
+class Batch {
+    _tasks := []
+    _batchSize := 5
+    _delay := 100
+
+    Add(task) {
+        this._tasks.Push(task)
+        return this
+    }
+
+    Execute() {
+        loop Ceil(this._tasks.Length / this._batchSize) {
+            batchNum := A_Index
+            startIdx := (batchNum - 1) * this._batchSize + 1
+            endIdx := Min(batchNum * this._batchSize, this._tasks.Length)
+
+            for i in range(startIdx, endIdx) {
+                try {
+                    this._tasks[i]()
+                } catch Error as e {
+                    OutputDebug("Task error: " . e.Message)
+                }
+            }
+
+            if (batchNum < Ceil(this._tasks.Length / this._batchSize)) {
+                Sleep(this._delay)
+            }
+        }
+
+        return this
+    }
+
+    Ceil(n) {
+        return n = Floor(n) ? n : Floor(n) + 1
+    }
+
+    Min(a, b) {
+        return a < b ? a : b
+    }
+
+    range(start, end) {
+        result := []
+        loop (end - start + 1)
+            result.Push(start + A_Index - 1)
+        return result
+    }
+}
+
+batch := Batch()
+loop 10 {
+    batch.Add(() => OutputDebug("Task " . A_Index))
+}
+
+; Concurrent task manager
+class ConcurrentTaskManager {
+    _running := []
+    _maxConcurrent := 3
+    _queue := []
+
+    AddTask(task) {
+        this._queue.Push(task)
+        return this
+    }
+
+    Start() {
+        this._ProcessQueue()
+        return this
+    }
+
+    _ProcessQueue() {
+        while (this._queue.Length > 0 && this._running.Length < this._maxConcurrent) {
+            task := this._queue.RemoveAt(1)
+            this._running.Push(task)
+
+            task(
+                () => this._TaskComplete()
+            )
+        }
+    }
+
+    _TaskComplete() {
+        this._running.RemoveAt(1)
+        this._ProcessQueue()
+    }
+}

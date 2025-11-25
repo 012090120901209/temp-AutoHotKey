@@ -1,0 +1,142 @@
+; Advanced Metaprogramming: __Get, __Set, __Call
+; Demonstrates dynamic property access and method invocation
+
+class DynamicObject {
+    _properties := Map()
+
+    __Get(name, params) {
+        ; Intercept property access
+        if (this._properties.Has(name)) {
+            return this._properties[name]
+        }
+        return "Property '" . name . "' not found"
+    }
+
+    __Set(name, params, value) {
+        ; Intercept property assignment
+        if (StrLen(name) = 0)
+            return
+        this._properties[name] := value
+    }
+}
+
+obj := DynamicObject()
+obj.name := "Alice"
+obj.age := 30
+obj.city := "New York"
+
+MsgBox(obj.name . ", " . obj.age)  ; Alice, 30
+MsgBox(obj.unknown)  ; Property 'unknown' not found
+
+; Method invocation interception
+class Proxy {
+    _target := ""
+    _methodCalls := 0
+
+    __New(target) {
+        this._target := target
+    }
+
+    __Call(name, params) {
+        ; Log method calls
+        this._methodCalls++
+        result := this._target[name](params*)
+        OutputDebug("Called: " . name . " (total: " . this._methodCalls . ")")
+        return result
+    }
+}
+
+class Calculator {
+    Add(a, b) {
+        return a + b
+    }
+
+    Multiply(a, b) {
+        return a * b
+    }
+}
+
+calc := Proxy(Calculator())
+calc.Add(5, 3)
+calc.Multiply(4, 2)
+
+; Automatic getter/setter generation
+class Model {
+    _data := Map()
+    _getters := Map()
+    _setters := Map()
+
+    DefineProperty(name, getter := unset, setter := unset) {
+        if (getter != unset)
+            this._getters[name] := getter
+        if (setter != unset)
+            this._setters[name] := setter
+    }
+
+    __Get(name, params) {
+        if (this._getters.Has(name))
+            return this._getters[name](this._data)
+
+        if (this._data.Has(name))
+            return this._data[name]
+
+        return unset
+    }
+
+    __Set(name, params, value) {
+        if (this._setters.Has(name)) {
+            this._setters[name](this._data, value)
+            return
+        }
+
+        this._data[name] := value
+    }
+}
+
+user := Model()
+user.DefineProperty("firstName",
+    (data) => data.Has("firstName") ? data["firstName"] : "",
+    (data, value) => data["firstName"] := StrUpper(value)
+)
+user.firstName := "alice"
+MsgBox(user.firstName)  ; ALICE (setter converted to upper)
+
+; Trait/Mixin pattern with composition
+class TimestampTrait {
+    _createdAt := ""
+    _updatedAt := ""
+
+    InitTimestamp() {
+        this._createdAt := A_Now
+        this._updatedAt := A_Now
+    }
+
+    UpdateTimestamp() {
+        this._updatedAt := A_Now
+    }
+
+    GetAge() {
+        ; Returns time in minutes since creation
+        return (A_Now - this._createdAt) / 100
+    }
+}
+
+class Document extends TimestampTrait {
+    Title := ""
+    Content := ""
+
+    __New(title) {
+        this.Title := title
+        this.InitTimestamp()
+    }
+
+    Update(content) {
+        this.Content := content
+        this.UpdateTimestamp()
+    }
+}
+
+doc := Document("My Note")
+Sleep(100)
+doc.Update("Updated content")
+MsgBox("Document age: " . Format("{:.2f}", doc.GetAge()) . " minutes")

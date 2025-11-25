@@ -1,0 +1,360 @@
+; Advanced File I/O and Stream Processing
+; Demonstrates file manipulation, streaming, and batching
+
+class FileManager {
+    _baseDir := ""
+
+    __New(baseDir := A_ScriptDir) {
+        this._baseDir := baseDir
+    }
+
+    CreateFile(filename, content := "") {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            FileAppend(content, fullPath)
+            return fullPath
+        } catch Error as e {
+            OutputDebug("Error creating file: " . e.Message)
+            return ""
+        }
+    }
+
+    ReadFile(filename) {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            return FileRead(fullPath)
+        } catch Error as e {
+            OutputDebug("Error reading file: " . e.Message)
+            return ""
+        }
+    }
+
+    WriteFile(filename, content) {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            FileDelete(fullPath)
+            FileAppend(content, fullPath)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    AppendFile(filename, content) {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            FileAppend(content, fullPath)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    DeleteFile(filename) {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            FileDelete(fullPath)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    CopyFile(sourceFile, destFile) {
+        sourcePath := this._baseDir . "\" . sourceFile
+        destPath := this._baseDir . "\" . destFile
+
+        try {
+            FileCopy(sourcePath, destPath, true)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    MoveFile(sourceFile, destFile) {
+        sourcePath := this._baseDir . "\" . sourceFile
+        destPath := this._baseDir . "\" . destFile
+
+        try {
+            FileMove(sourcePath, destPath, true)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    FileExists(filename) {
+        return FileExist(this._baseDir . "\" . filename) != ""
+    }
+
+    ListFiles(pattern := "*") {
+        files := []
+
+        try {
+            loop Files, this._baseDir . "\" . pattern, "F" {
+                files.Push(A_LoopFileName)
+            }
+        } catch Error {
+            ; Handle error
+        }
+
+        return files
+    }
+
+    ListDirectories() {
+        dirs := []
+
+        try {
+            loop Files, this._baseDir . "\*", "D" {
+                dirs.Push(A_LoopFileName)
+            }
+        } catch Error {
+            ; Handle error
+        }
+
+        return dirs
+    }
+
+    GetFileSize(filename) {
+        fullPath := this._baseDir . "\" . filename
+
+        try {
+            fileSize := FileGetSize(fullPath)
+            return fileSize
+        } catch Error {
+            return -1
+        }
+    }
+}
+
+; CSV file handler
+class CSVFile {
+    _path := ""
+    _delimiter := ","
+    _data := []
+
+    __New(path, delimiter := ",") {
+        this._path := path
+        this._delimiter := delimiter
+    }
+
+    Read() {
+        try {
+            content := FileRead(this._path)
+            lines := StrSplit(content, "`n")
+            this._data := []
+
+            for line in lines {
+                line := StrTrim(line)
+                if (line != "") {
+                    fields := StrSplit(line, this._delimiter)
+                    this._data.Push(fields)
+                }
+            }
+
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    Write() {
+        try {
+            content := ""
+            for row in this._data {
+                content .= StrJoin(this._delimiter, row) . "`n"
+            }
+
+            FileDelete(this._path)
+            FileAppend(content, this._path)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    AddRow(fields) {
+        this._data.Push(fields)
+        return this
+    }
+
+    GetRow(index) {
+        if (index > 0 && index <= this._data.Length)
+            return this._data[index]
+        return []
+    }
+
+    GetData() {
+        return this._data
+    }
+
+    StrJoin(sep, arr) {
+        result := ""
+        for item in arr
+            result .= (result ? sep : "") . item
+        return result
+    }
+}
+
+; Log file handler
+class Logger {
+    _logFile := ""
+    _maxSize := 1000000  ; 1MB default
+    _autoFlush := true
+
+    __New(logFile, maxSize := 1000000) {
+        this._logFile := logFile
+        this._maxSize := maxSize
+    }
+
+    Log(message, level := "INFO") {
+        timestamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
+        logEntry := "[" . timestamp . "] [" . level . "] " . message
+
+        try {
+            FileAppend(logEntry . "`n", this._logFile)
+
+            if (this._autoFlush) {
+                this._CheckSize()
+            }
+        } catch Error as e {
+            OutputDebug("Logging failed: " . e.Message)
+        }
+
+        return this
+    }
+
+    Info(message) => this.Log(message, "INFO")
+
+    Warning(message) => this.Log(message, "WARN")
+
+    Error(message) => this.Log(message, "ERROR")
+
+    Debug(message) => this.Log(message, "DEBUG")
+
+    _CheckSize() {
+        try {
+            fileSize := FileGetSize(this._logFile)
+
+            if (fileSize > this._maxSize) {
+                this._RotateLog()
+            }
+        } catch Error {
+            ; Handle error
+        }
+    }
+
+    _RotateLog() {
+        timestamp := FormatTime(A_Now, "yyyyMMdd_HHmmss")
+        backupFile := StrReplace(this._logFile, ".log", "_" . timestamp . ".log")
+
+        try {
+            FileMove(this._logFile, backupFile)
+        } catch Error {
+            ; Handle error
+        }
+    }
+}
+
+logger := Logger(A_ScriptDir . "\app.log")
+logger.Info("Application started")
+logger.Debug("Debug message")
+
+; Directory operations
+class DirectoryHelper {
+    static Create(path) {
+        try {
+            DirCreate(path)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static Delete(path, recursive := true) {
+        try {
+            if (recursive)
+                DirDelete(path, 1)
+            else
+                DirDelete(path)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static Exists(path) {
+        return DirExist(path) != ""
+    }
+
+    static GetSize(path) {
+        totalSize := 0
+
+        try {
+            loop Files, path . "\*.*", "FR" {
+                totalSize += FileGetSize(A_LoopFileFullPath)
+            }
+        } catch Error {
+            return -1
+        }
+
+        return totalSize
+    }
+
+    static Copy(source, destination) {
+        try {
+            ; Copy directory and contents
+            loop Files, source . "\*.*", "FR" {
+                destFile := StrReplace(A_LoopFileFullPath, source, destination)
+                FileCopy(A_LoopFileFullPath, destFile, true)
+            }
+            return true
+        } catch Error {
+            return false
+        }
+    }
+}
+
+; Batch file processor
+class BatchFileProcessor {
+    _directory := ""
+    _pattern := "*"
+    _processor := ""
+
+    __New(directory, pattern := "*") {
+        this._directory := directory
+        this._pattern := pattern
+    }
+
+    OnFile(processorFn) {
+        this._processor := processorFn
+        return this
+    }
+
+    Process() {
+        count := 0
+
+        try {
+            loop Files, this._directory . "\" . this._pattern, "F" {
+                if (this._processor) {
+                    this._processor(A_LoopFileFullPath)
+                }
+                count++
+            }
+        } catch Error {
+            return -1
+        }
+
+        return count
+    }
+}
+
+processor := BatchFileProcessor(A_ScriptDir, "*.txt")
+processor.OnFile((file) => OutputDebug("Processing: " . file))
+MsgBox("Processed " . processor.Process() . " files")

@@ -1,0 +1,114 @@
+; Advanced Collection Querying and LINQ-style Operations
+; Demonstrates chaining, sorting, and complex queries
+
+; Generic sorting with custom comparator
+Sort(arr, compareFn) {
+    result := arr.Clone()
+
+    loop (result.Length - 1) {
+        minIdx := A_Index
+        loop (result.Length - A_Index) {
+            if (compareFn(result[A_Index + minIdx - 1], result[minIdx]) > 0)
+                minIdx := A_Index + minIdx - 1
+        }
+
+        ; Swap
+        temp := result[A_Index]
+        result[A_Index] := result[minIdx]
+        result[minIdx] := temp
+    }
+
+    return result
+}
+
+numbers := [5, 2, 8, 1, 9, 3]
+sorted := Sort(numbers, (a, b) => a < b ? -1 : (a > b ? 1 : 0))
+MsgBox("Sorted: " . sorted[1] . ", " . sorted[2] . ", " . sorted[3])  ; 1, 2, 3
+
+; Chain queries with fluent interface
+QueryBuilder(arr) {
+    return {
+        data: arr.Clone(),
+        Where: (predicate) => (this.data := Filter(this.data, predicate), this),
+        Select: (transformer) => (this.data := Map(this.data, transformer), this),
+        OrderBy: (keyFn) => (this.data := Sort(this.data, (a, b) =>
+            keyFn(a) < keyFn(b) ? -1 : (keyFn(a) > keyFn(b) ? 1 : 0)), this),
+        Take: (count) => (this.data := this.data.Length > count ?
+            this.data.Slice(1, count) : this.data, this),
+        Skip: (count) => (this.data := this.data.Length > count ?
+            this.data.Slice(count + 1) : [], this),
+        ToArray: () => this.data
+    }
+}
+
+Filter(arr, pred) => (result := [], loop (arr.Length)
+    pred(arr[A_Index]) && result.Push(arr[A_Index]), result)
+
+Map(arr, xfm) => (result := [], loop (arr.Length)
+    result.Push(xfm(arr[A_Index])), result)
+
+Sort(arr, cmp) => (result := arr.Clone(),
+    loop (result.Length - 1) {
+        minIdx := A_Index
+        loop (result.Length - A_Index)
+            cmp(result[A_Index + minIdx - 1], result[minIdx]) > 0 && minIdx := A_Index + minIdx - 1
+        temp := result[A_Index], result[A_Index] := result[minIdx], result[minIdx] := temp
+    }, result)
+
+data := [
+    {name: "Alice", score: 85},
+    {name: "Bob", score: 75},
+    {name: "Charlie", score: 95},
+    {name: "Diana", score: 80}
+]
+
+result := QueryBuilder(data)
+    .Where((p) => p.score >= 80)
+    .OrderBy((p) => -p.score)  ; Descending
+    .Take(2)
+    .ToArray()
+
+MsgBox("Top 2 scorers >= 80: " . result.Length)
+
+; Array flattening
+Flatten(arr, depth := Infinity) {
+    if (depth = 0)
+        return arr
+
+    result := []
+    for item in arr {
+        if (Type(item) = "Array" && depth > 0) {
+            for subitem in Flatten(item, depth - 1)
+                result.Push(subitem)
+        } else {
+            result.Push(item)
+        }
+    }
+
+    return result
+}
+
+nested := [1, [2, [3, 4]], 5, [[6, 7], 8]]
+flat := Flatten(nested, 2)
+MsgBox("Flattened array length: " . flat.Length)
+
+; Find and search operations
+FindIndex(arr, predicate) {
+    loop (arr.Length) {
+        if (predicate(arr[A_Index]))
+            return A_Index
+    }
+    return -1
+}
+
+FindAll(arr, predicate) {
+    result := []
+    loop (arr.Length) {
+        if (predicate(arr[A_Index]))
+            result.Push(A_Index)
+    }
+    return result
+}
+
+idx := FindIndex(numbers, (n) => n > 5)
+MsgBox("First number > 5 at index: " . idx)

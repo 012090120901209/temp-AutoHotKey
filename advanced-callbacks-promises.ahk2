@@ -1,0 +1,191 @@
+; Advanced Callback Patterns and Promise-like Behavior
+; Demonstrates async-like patterns with callbacks and chainable operations
+
+; Promise-like pattern with .Then()
+class Future {
+    _value := unset
+    _error := unset
+    _thenHandlers := []
+    _catchHandlers := []
+    _resolved := false
+
+    Then(handler) {
+        if (this._resolved && this._error = unset) {
+            handler(this._value)
+        } else if (!this._resolved) {
+            this._thenHandlers.Push(handler)
+        }
+        return this
+    }
+
+    Catch(handler) {
+        if (this._resolved && this._error != unset) {
+            handler(this._error)
+        } else if (!this._resolved) {
+            this._catchHandlers.Push(handler)
+        }
+        return this
+    }
+
+    Resolve(value) {
+        if (this._resolved)
+            return
+
+        this._value := value
+        this._resolved := true
+
+        for handler in this._thenHandlers {
+            handler(value)
+        }
+
+        this._thenHandlers := []
+        return this
+    }
+
+    Reject(error) {
+        if (this._resolved)
+            return
+
+        this._error := error
+        this._resolved := true
+
+        for handler in this._catchHandlers {
+            handler(error)
+        }
+
+        this._catchHandlers := []
+        return this
+    }
+}
+
+; Usage of Promise-like pattern
+future := Future()
+
+future
+    .Then((result) => MsgBox("Success: " . result))
+    .Catch((error) => MsgBox("Error: " . error))
+
+future.Resolve("Operation completed!")
+
+; Event listener pattern with unsubscribe
+class EventBus {
+    _events := Map()
+
+    Subscribe(event, handler) {
+        if (!this._events.Has(event))
+            this._events[event] := []
+
+        this._events[event].Push(handler)
+
+        ; Return unsubscribe function
+        return () => {
+            listeners := this._events[event]
+            for idx, h in listeners {
+                if (h = handler) {
+                    listeners.RemoveAt(idx)
+                    break
+                }
+            }
+        }
+    }
+
+    Emit(event, data := "") {
+        if (this._events.Has(event)) {
+            for handler in this._events[event] {
+                handler(data)
+            }
+        }
+    }
+}
+
+bus := EventBus()
+
+unsubscribe1 := bus.Subscribe("message", (msg) => MsgBox("Handler 1: " . msg))
+unsubscribe2 := bus.Subscribe("message", (msg) => MsgBox("Handler 2: " . msg))
+
+bus.Emit("message", "Hello")
+
+unsubscribe1()  ; Remove first handler
+
+bus.Emit("message", "Hello again")  ; Only handler 2 fires
+
+; Chainable builder with callbacks
+class AsyncTask {
+    _name := ""
+    _steps := []
+
+    __New(name) {
+        this._name := name
+    }
+
+    AddStep(fn) {
+        this._steps.Push(fn)
+        return this
+    }
+
+    Execute(onSuccess, onError) {
+        try {
+            for step in this._steps {
+                step()
+            }
+            onSuccess("Task '" . this._name . "' completed")
+        } catch Error as e {
+            onError(e.Message)
+        }
+    }
+}
+
+task := AsyncTask("DataProcess")
+    .AddStep(() => MsgBox("Step 1: Reading data"))
+    .AddStep(() => MsgBox("Step 2: Processing"))
+    .AddStep(() => MsgBox("Step 3: Saving"))
+
+task.Execute(
+    (result) => MsgBox("✓ " . result),
+    (error) => MsgBox("✗ Error: " . error)
+)
+
+; Debounce and throttle patterns
+Debounce(fn, delay) {
+    lastCall := 0
+    timerId := ""
+
+    return () => {
+        now := A_TickCount
+        if (timerId) {
+            SetTimer(timerId, 0)
+        }
+
+        timerId := SetTimer(() => fn(), delay)
+    }
+}
+
+Throttle(fn, delay) {
+    lastCall := 0
+
+    return () => {
+        now := A_TickCount
+        if (now - lastCall >= delay) {
+            fn()
+            lastCall := now
+        }
+    }
+}
+
+; Sequential callback execution
+Sequential(tasks*) {
+    Execute(index := 1) {
+        if (index > tasks.Length)
+            return
+
+        tasks[index](() => Execute(index + 1))
+    }
+
+    Execute()
+}
+
+Sequential(
+    (next) => (MsgBox("Task 1"), next()),
+    (next) => (MsgBox("Task 2"), next()),
+    (next) => (MsgBox("Task 3"), next())
+)

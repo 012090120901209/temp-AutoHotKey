@@ -1,0 +1,78 @@
+; Advanced String Interpolation and Template Literals
+; Demonstrates dynamic string generation and template processing
+
+; Basic string interpolation with expressions
+name := "Alice"
+age := 30
+message := "Name: " . name . ", Age: " . age . ", Next year: " . (age + 1)
+MsgBox(message)
+
+; Template literal pattern with placeholder replacement
+Template(str, data) {
+    result := str
+
+    for key, value in data {
+        ; Support {{key}} and ${key} syntax
+        result := StrReplace(result, "{{" . key . "}}", value)
+        result := StrReplace(result, "${" . key . "}", value)
+    }
+
+    return result
+}
+
+user := Map("name", "Bob", "email", "bob@example.com", "verified", "yes")
+template := "User: {{name}}, Email: ${email}, Verified: {{verified}}"
+MsgBox(Template(template, user))
+
+; Expression interpolation with evaluation
+EvalTemplate(str, context) {
+    ; Replace ${expr} with evaluation results
+    pattern := "\$\{([^}]+)\}"
+
+    result := str
+    pos := 1
+    while (pos := RegExMatch(str, pattern, match, pos)) {
+        expr := match[1]
+        ; Note: Limited eval for safety - only simple expressions
+        value := context[expr] ?? expr
+        result := StrReplace(result, "${" . expr . "}", value)
+        pos += StrLen(match[0])
+    }
+
+    return result
+}
+
+ctx := Map("count", 5, "name", "test")
+MsgBox(EvalTemplate("Items: ${count}, Name: ${name}", ctx))
+
+; Multi-line template strings
+MultilineTemplate() {
+    return "
+    (
+    ===============================
+    Welcome to AutoHotkey v2
+    ===============================
+    This is a multi-line template
+    with preserved formatting
+    )"
+}
+
+MsgBox(MultilineTemplate())
+
+; String formatting utilities
+FormatDate(date, format := "YYYY-MM-DD") {
+    ; Simple date formatter
+    year := SubStr(date, 1, 4)
+    month := SubStr(date, 5, 2)
+    day := SubStr(date, 7, 2)
+
+    result := format
+    result := StrReplace(result, "YYYY", year)
+    result := StrReplace(result, "MM", month)
+    result := StrReplace(result, "DD", day)
+
+    return result
+}
+
+MsgBox(FormatDate(A_Now, "DD/MM/YYYY"))
+MsgBox(FormatDate(A_Now, "YYYY-MM-DD"))

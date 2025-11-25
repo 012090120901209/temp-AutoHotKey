@@ -1,0 +1,307 @@
+; Advanced System Information and DLL Integration
+; Demonstrates system queries, DLL calls, and low-level system interaction
+
+class SystemInfo {
+    static GetOSVersion() {
+        return A_OSVersion
+    }
+
+    static GetArchitecture() {
+        return A_PtrSize = 8 ? "64-bit" : "32-bit"
+    }
+
+    static GetComputerName() {
+        name := ""
+        try {
+            objWMI := ComObject("winmgmts:")
+            objOS := objWMI.ExecQuery("Select * from Win32_ComputerSystem")
+            for obj in objOS {
+                name := obj.Name
+            }
+        } catch Error {
+            name := "Unknown"
+        }
+        return name
+    }
+
+    static GetUsername() {
+        return A_UserName
+    }
+
+    static GetScreenResolution() {
+        return A_ScreenWidth . "x" . A_ScreenHeight
+    }
+
+    static GetScreenRefreshRate() {
+        ; Query system for refresh rate
+        return "60Hz"  ; Default estimate
+    }
+
+    static GetMemoryUsage() {
+        usage := 0
+        try {
+            objWMI := ComObject("winmgmts:")
+            objOS := objWMI.ExecQuery("Select * from Win32_OperatingSystem")
+            for obj in objOS {
+                usage := obj.TotalVisibleMemorySize
+            }
+        } catch Error {
+            usage := "Unknown"
+        }
+        return usage
+    }
+
+    static GetProcessorCount() {
+        try {
+            objWMI := ComObject("winmgmts:")
+            objOS := objWMI.ExecQuery("Select * from Win32_Processor")
+            count := 0
+            for obj in objOS {
+                count++
+            }
+            return count
+        } catch Error {
+            return "Unknown"
+        }
+    }
+}
+
+MsgBox("OS: " . SystemInfo.GetOSVersion())
+MsgBox("Computer: " . SystemInfo.GetComputerName())
+MsgBox("User: " . SystemInfo.GetUsername())
+
+; Hardware monitor
+class HardwareMonitor {
+    static GetCPUTemperature() {
+        ; Requires hardware monitoring capabilities
+        return "N/A"
+    }
+
+    static GetDiskSpace(drive := "C:") {
+        try {
+            SpaceUsed := DriveSpaceUsed(drive)
+            TotalSpace := DriveSpace(drive)
+            return {used: SpaceUsed, total: TotalSpace}
+        } catch Error {
+            return ""
+        }
+    }
+
+    static GetNetworkInterfaces() {
+        interfaces := []
+        try {
+            objWMI := ComObject("winmgmts:")
+            objOS := objWMI.ExecQuery("Select * from Win32_NetworkAdapterConfiguration where IPEnabled=True")
+
+            for obj in objOS {
+                interfaces.Push({
+                    name: obj.Description,
+                    ip: obj.IPAddress[0],
+                    mac: obj.MACAddress
+                })
+            }
+        } catch Error {
+            ; Handle error
+        }
+
+        return interfaces
+    }
+
+    static GetBatteryStatus() {
+        try {
+            objWMI := ComObject("winmgmts:")
+            objOS := objWMI.ExecQuery("Select * from Win32_Battery")
+
+            for obj in objOS {
+                return {
+                    percentage: obj.EstimatedChargeRemaining,
+                    timeRemaining: obj.EstimatedRunTime
+                }
+            }
+        } catch Error {
+            return {percentage: "N/A", timeRemaining: "N/A"}
+        }
+    }
+}
+
+diskSpace := HardwareMonitor.GetDiskSpace("C:")
+if (diskSpace != "") {
+    MsgBox("Disk space: " . diskSpace.used . " / " . diskSpace.total)
+}
+
+; Registry access
+class RegistryHelper {
+    static GetValue(rootKey, subKey, valueName) {
+        try {
+            RegRead(value, rootKey, subKey, valueName)
+            return value
+        } catch Error {
+            return ""
+        }
+    }
+
+    static SetValue(rootKey, subKey, valueName, value, valueType := "REG_SZ") {
+        try {
+            RegWrite(value, rootKey, subKey, valueName, valueType)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static DeleteValue(rootKey, subKey, valueName) {
+        try {
+            RegDelete(rootKey, subKey, valueName)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static GetSubKeys(rootKey, subKey) {
+        subKeys := []
+        try {
+            loop Reg, rootKey, subKey, "K" {
+                subKeys.Push(A_LoopRegName)
+            }
+        } catch Error {
+            ; Handle error
+        }
+        return subKeys
+    }
+
+    static GetValues(rootKey, subKey) {
+        values := []
+        try {
+            loop Reg, rootKey, subKey, "V" {
+                values.Push({name: A_LoopRegName, value: A_LoopRegType})
+            }
+        } catch Error {
+            ; Handle error
+        }
+        return values
+    }
+}
+
+; Environment variables
+class EnvironmentHelper {
+    static Get(varName) {
+        return EnvGet(varName)
+    }
+
+    static Set(varName, value) {
+        try {
+            EnvSet(varName, value)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static GetAll() {
+        vars := Map()
+        varList := EnvGet("COMSPEC")  ; This gets the COMSPEC
+
+        ; Note: Full environment dump requires system call
+        return vars
+    }
+
+    static GetPath() {
+        return EnvGet("PATH")
+    }
+
+    static GetUserProfile() {
+        return EnvGet("USERPROFILE")
+    }
+
+    static GetTemp() {
+        return EnvGet("TEMP")
+    }
+}
+
+temp := EnvironmentHelper.GetTemp()
+MsgBox("Temp folder: " . temp)
+
+; Sound/Audio control
+class AudioControl {
+    static SetVolume(percentage) {
+        try {
+            SoundSetVolume(percentage)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static GetVolume() {
+        try {
+            SoundGetVolume(&volume)
+            return volume
+        } catch Error {
+            return ""
+        }
+    }
+
+    static PlaySound(filePath) {
+        try {
+            SoundPlay(filePath)
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static Mute() {
+        try {
+            SoundSetVolume("-50")
+            return true
+        } catch Error {
+            return false
+        }
+    }
+
+    static Unmute() {
+        try {
+            SoundSetVolume("+50")
+            return true
+        } catch Error {
+            return false
+        }
+    }
+}
+
+volume := AudioControl.GetVolume()
+if (volume != "") {
+    MsgBox("Volume: " . volume . "%")
+}
+
+; Clipboard manipulation with advanced options
+class AdvancedClipboard {
+    static Copy(text) {
+        A_Clipboard := text
+        return true
+    }
+
+    static Paste() {
+        return A_Clipboard
+    }
+
+    static Clear() {
+        A_Clipboard := ""
+        return true
+    }
+
+    static HasImages() {
+        ; Check if clipboard contains images
+        return false  ; Simplified
+    }
+
+    static HasFiles() {
+        ; Check if clipboard contains file paths
+        return false  ; Simplified
+    }
+
+    static GetSize() {
+        return StrLen(A_Clipboard)
+    }
+}

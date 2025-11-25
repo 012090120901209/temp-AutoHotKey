@@ -1,0 +1,106 @@
+; Advanced Map (Dictionary) Operations and Patterns
+; Demonstrates grouping, transformations, and nested structures
+
+; Map grouping by key extractor
+GroupBy(arr, keyFn) {
+    groups := Map()
+
+    for item in arr {
+        key := keyFn(item)
+        if (!groups.Has(key))
+            groups[key] := []
+        groups[key].Push(item)
+    }
+
+    return groups
+}
+
+people := [
+    {name: "Alice", age: 30, dept: "Engineering"},
+    {name: "Bob", age: 25, dept: "Sales"},
+    {name: "Charlie", age: 30, dept: "Engineering"},
+    {name: "Diana", age: 25, dept: "Marketing"}
+]
+
+byAge := GroupBy(people, (p) => p.age)
+MsgBox("Age 25: " . byAge[25].Length . " people, Age 30: " . byAge[30].Length . " people")
+
+; Map transformation (key-value pairs)
+MapTransform(inputMap, transformer) {
+    result := Map()
+
+    for key, value in inputMap {
+        newPair := transformer(key, value)
+        result[newPair[1]] := newPair[2]
+    }
+
+    return result
+}
+
+config := Map("timeout", 5000, "retries", 3, "debug", true)
+transformed := MapTransform(config, (k, v) => [StrUpper(k), Type(v) = "String" ? v : String(v)])
+
+for key, value in transformed {
+    MsgBox(key . ": " . value)
+}
+
+; Nested map access with safe fallback
+GetNested(map, path, default := unset) {
+    parts := StrSplit(path, ".")
+    current := map
+
+    for key in parts {
+        if Type(current) = "Map" && current.Has(key) {
+            current := current[key]
+        } else {
+            return default
+        }
+    }
+
+    return current
+}
+
+data := Map(
+    "user", Map("profile", Map("name", "Alice", "email", "alice@example.com"))
+)
+
+MsgBox(GetNested(data, "user.profile.name"))      ; Alice
+MsgBox(GetNested(data, "user.profile.phone", "N/A"))  ; N/A
+
+; Map merging and combining
+MergeMaps(map1, map2, overwrite := true) {
+    result := Map()
+
+    for key, value in map1 {
+        result[key] := value
+    }
+
+    for key, value in map2 {
+        if (!overwrite && result.Has(key))
+            continue
+        result[key] := value
+    }
+
+    return result
+}
+
+defaults := Map("theme", "light", "language", "en")
+userPrefs := Map("theme", "dark")
+merged := MergeMaps(defaults, userPrefs)
+
+MsgBox("Theme: " . merged["theme"])  ; dark
+
+; Map inversion (swap keys and values)
+InvertMap(map) {
+    result := Map()
+
+    for key, value in map {
+        result[value] := key
+    }
+
+    return result
+}
+
+mapping := Map("a", 1, "b", 2, "c", 3)
+inverted := InvertMap(mapping)
+MsgBox("Value 2 is key: " . inverted[2])  ; b

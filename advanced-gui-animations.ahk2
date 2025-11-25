@@ -1,0 +1,300 @@
+; Advanced GUI Animations and Transitions
+; Demonstrates animated effects, progress indicators, and visual transitions
+
+class Animation {
+    _startValue := 0
+    _endValue := 100
+    _duration := 1000
+    _callback := ""
+    _timerId := ""
+    _startTime := 0
+
+    __New(startValue, endValue, duration := 1000) {
+        this._startValue := startValue
+        this._endValue := endValue
+        this._duration := duration
+    }
+
+    OnFrame(callback) {
+        this._callback := callback
+        return this
+    }
+
+    Start() {
+        this._startTime := A_TickCount
+
+        this._timerId := SetTimer(() => {
+            elapsed := A_TickCount - this._startTime
+
+            if (elapsed >= this._duration) {
+                if (this._callback)
+                    this._callback(this._endValue)
+
+                SetTimer(this._timerId, 0)
+                return
+            }
+
+            progress := elapsed / this._duration
+            currentValue := this._startValue +
+                (this._endValue - this._startValue) * progress
+
+            if (this._callback)
+                this._callback(currentValue)
+        }, 16)  ; ~60 FPS
+
+        return this
+    }
+
+    Stop() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+    }
+}
+
+; Easing functions
+class Easer {
+    static Linear(t) => t
+
+    static EaseIn(t) => t * t
+
+    static EaseOut(t) => t * (2 - t)
+
+    static EaseInOut(t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+
+    static Bounce(t) {
+        if (t < 0.5)
+            return 8 * t * t * t * t
+        return 1 - 8 * (1 - t) ** 4
+    }
+}
+
+; Progress bar animator
+class ProgressBar {
+    _value := 0
+    _maxValue := 100
+    _animating := false
+
+    __New(maxValue := 100) {
+        this._maxValue := maxValue
+    }
+
+    SetProgress(value, animated := true) {
+        if (!animated) {
+            this._value := value
+            return
+        }
+
+        animation := Animation(this._value, value, 300)
+        animation.OnFrame((v) => (this._value := v))
+        animation.Start()
+    }
+
+    GetProgress() {
+        return this._value
+    }
+
+    GetPercentage() {
+        return (this._value / this._maxValue) * 100
+    }
+
+    Display() {
+        percentage := Format("{:.1f}", this.GetPercentage())
+        filled := Floor(this.GetPercentage() / 5)
+        empty := 20 - filled
+
+        bar := "["
+        loop filled
+            bar .= "="
+        loop empty
+            bar .= "-"
+        bar .= "]"
+
+        return bar . " " . percentage . "%"
+    }
+}
+
+progressBar := ProgressBar(100)
+progressBar.SetProgress(25, true)
+Sleep(400)
+MsgBox(progressBar.Display())
+
+progressBar.SetProgress(75, true)
+Sleep(400)
+MsgBox(progressBar.Display())
+
+; Fade in/out effects
+class FadeEffect {
+    _opacity := 100
+    _timerId := ""
+
+    FadeOut(duration := 500, callback := "") {
+        startOpacity := this._opacity
+        startTime := A_TickCount
+
+        this._timerId := SetTimer(() => {
+            elapsed := A_TickCount - startTime
+
+            if (elapsed >= duration) {
+                this._opacity := 0
+                SetTimer(this._timerId, 0)
+                if (callback)
+                    callback()
+                return
+            }
+
+            progress := elapsed / duration
+            this._opacity := startOpacity * (1 - progress)
+        }, 16)
+    }
+
+    FadeIn(duration := 500, callback := "") {
+        startOpacity := this._opacity
+        startTime := A_TickCount
+
+        this._timerId := SetTimer(() => {
+            elapsed := A_TickCount - startTime
+
+            if (elapsed >= duration) {
+                this._opacity := 100
+                SetTimer(this._timerId, 0)
+                if (callback)
+                    callback()
+                return
+            }
+
+            progress := elapsed / duration
+            this._opacity := startOpacity + (100 - startOpacity) * progress
+        }, 16)
+    }
+
+    GetOpacity() {
+        return this._opacity
+    }
+}
+
+fade := FadeEffect()
+fade.FadeOut(1000, () => MsgBox("Fade out complete"))
+
+; Sliding animation
+class SlideAnimation {
+    _position := 0
+    _targetPosition := 0
+
+    SlideTo(targetX, duration := 500) {
+        startPos := this._position
+        startTime := A_TickCount
+
+        timerId := SetTimer(() => {
+            elapsed := A_TickCount - startTime
+
+            if (elapsed >= duration) {
+                this._position := targetX
+                SetTimer(timerId, 0)
+                return
+            }
+
+            progress := elapsed / duration
+            this._position := startPos + (targetX - startPos) * progress
+        }, 16)
+    }
+
+    GetPosition() {
+        return Format("{:.0f}", this._position)
+    }
+}
+
+slide := SlideAnimation()
+slide.SlideTo(100, 1000)
+
+; Pulsing effect
+class PulseEffect {
+    _intensity := 100
+    _timerId := ""
+
+    StartPulse(duration := 1000, callback := "") {
+        startTime := A_TickCount
+        baseIntensity := this._intensity
+
+        this._timerId := SetTimer(() => {
+            elapsed := A_TickCount - startTime
+            cycle := Mod(elapsed, duration) / duration
+
+            ; Sine wave pulse
+            this._intensity := baseIntensity + 30 * Sin(cycle * 2 * 3.14159)
+
+            if (callback)
+                callback(Format("{:.0f}", this._intensity))
+        }, 16)
+    }
+
+    StopPulse() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+    }
+
+    GetIntensity() {
+        return Format("{:.0f}", this._intensity)
+    }
+}
+
+pulse := PulseEffect()
+pulse.StartPulse(1000)
+Sleep(3000)
+pulse.StopPulse()
+
+; Transition between values
+class Transition {
+    _current := 0
+    _target := 0
+    _duration := 1000
+    _easing := Easer.Linear
+    _callback := ""
+
+    __New(startValue := 0) {
+        this._current := startValue
+    }
+
+    To(targetValue, duration := 1000, easing := Easer.Linear) {
+        this._target := targetValue
+        this._duration := duration
+        this._easing := easing
+
+        startValue := this._current
+        startTime := A_TickCount
+
+        timerId := SetTimer(() => {
+            elapsed := A_TickCount - startTime
+
+            if (elapsed >= duration) {
+                this._current := targetValue
+                SetTimer(timerId, 0)
+                if (this._callback)
+                    this._callback(this._current)
+                return
+            }
+
+            progress := this._easing(elapsed / duration)
+            this._current := startValue + (targetValue - startValue) * progress
+
+            if (this._callback)
+                this._callback(this._current)
+        }, 16)
+
+        return this
+    }
+
+    OnUpdate(callback) {
+        this._callback := callback
+        return this
+    }
+
+    GetValue() {
+        return this._current
+    }
+}
+
+transition := Transition(0)
+    .OnUpdate((v) => OutputDebug("Value: " . Format("{:.2f}", v)))
+    .To(100, 500, Easer.EaseInOut)

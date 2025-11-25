@@ -1,0 +1,272 @@
+; Advanced Network Utilities and Web Integration
+; Demonstrates URL handling, encoding, and web interactions
+
+class URLHelper {
+    static Encode(text) {
+        ; Simple URL encoding
+        encoded := ""
+        loop StrLen(text) {
+            char := SubStr(text, A_Index, 1)
+
+            if (char ~= "[A-Za-z0-9\-_.~]") {
+                encoded .= char
+            } else {
+                ; URL encode special characters
+                encoded .= "%" . Format("{:02X}", Ord(char))
+            }
+        }
+
+        return encoded
+    }
+
+    static Decode(encoded) {
+        decoded := ""
+        i := 1
+
+        loop StrLen(encoded) {
+            char := SubStr(encoded, i, 1)
+
+            if (char = "%") {
+                hexCode := SubStr(encoded, i + 1, 2)
+                decoded .= Chr("0x" . hexCode)
+                i += 3
+            } else {
+                decoded .= char
+                i++
+            }
+        }
+
+        return decoded
+    }
+
+    static QueryString(params := Map()) {
+        pairs := []
+
+        for key, value in params {
+            pairs.Push(this.Encode(key) . "=" . this.Encode(value))
+        }
+
+        return StrJoin("&", pairs)
+    }
+
+    static ParseQueryString(queryStr) {
+        params := Map()
+        pairs := StrSplit(queryStr, "&")
+
+        for pair in pairs {
+            parts := StrSplit(pair, "=")
+            if (parts.Length = 2) {
+                params[this.Decode(parts[1])] := this.Decode(parts[2])
+            }
+        }
+
+        return params
+    }
+
+    static StrJoin(sep, arr) {
+        result := ""
+        for item in arr
+            result .= (result ? sep : "") . item
+        return result
+    }
+}
+
+; Test URL encoding
+params := Map("name", "John Doe", "email", "john@example.com")
+queryStr := URLHelper.QueryString(params)
+MsgBox("Query string: " . queryStr)
+
+; HTTP client simulator
+class HTTPClient {
+    _headers := Map()
+    _timeout := 5000
+
+    AddHeader(name, value) {
+        this._headers[name] := value
+        return this
+    }
+
+    SetTimeout(ms) {
+        this._timeout := ms
+        return this
+    }
+
+    Get(url) {
+        return this._Request("GET", url)
+    }
+
+    Post(url, data) {
+        return this._Request("POST", url, data)
+    }
+
+    Put(url, data) {
+        return this._Request("PUT", url, data)
+    }
+
+    Delete(url) {
+        return this._Request("DELETE", url)
+    }
+
+    _Request(method, url, data := "") {
+        try {
+            whr := ComObject("MSXML2.XMLHTTP")
+            whr.Open(method, url, false)
+
+            for name, value in this._headers {
+                whr.SetRequestHeader(name, value)
+            }
+
+            if (data != "")
+                whr.Send(data)
+            else
+                whr.Send()
+
+            return {
+                status: whr.Status,
+                response: whr.ResponseText,
+                headers: whr.GetAllResponseHeaders()
+            }
+        } catch Error as e {
+            return {status: 0, response: "", error: e.Message}
+        }
+    }
+}
+
+; IP address utilities
+class IPHelper {
+    static IsValid(ip) {
+        parts := StrSplit(ip, ".")
+
+        if (parts.Length != 4)
+            return false
+
+        for part in parts {
+            num := part + 0
+            if (num < 0 || num > 255 || part != num)
+                return false
+        }
+
+        return true
+    }
+
+    static IsLocal(ip) {
+        if (SubStr(ip, 1, 3) = "127")
+            return true
+        if (SubStr(ip, 1, 3) = "192")
+            return InStr(ip, "168")
+
+        return false
+    }
+
+    static IsPrivate(ip) {
+        first := SubStr(ip, 1, InStr(ip, ".") - 1) + 0
+
+        switch first {
+            case 10:
+            case 172:
+            case 192:
+                return true
+        }
+
+        return false
+    }
+
+    static Ping(host) {
+        try {
+            shell := ComObject("WScript.Shell")
+            exec := shell.Exec(ComSpec " /c ping -n 1 " . host)
+            output := exec.StdOut.ReadAll()
+
+            return InStr(output, "Reply from") ? true : false
+        } catch Error {
+            return false
+        }
+    }
+
+    static ComSpec => EnvGet("ComSpec")
+}
+
+; DNS helper
+class DNSHelper {
+    static Resolve(hostname) {
+        try {
+            WinHTTP := ComObject("WinHttp.WinHttpRequest.5.1")
+            ; Simplified DNS resolution
+
+            return ""
+        } catch Error {
+            return ""
+        }
+    }
+
+    static ReverseResolve(ip) {
+        ; Reverse DNS lookup
+        return ""
+    }
+}
+
+; Port checker
+class PortChecker {
+    static IsOpen(host, port, timeout := 3000) {
+        try {
+            ; Check if port is open
+            startTime := A_TickCount
+
+            while (A_TickCount - startTime < timeout) {
+                ; Try to connect
+                ; Simplified implementation
+                Sleep(100)
+            }
+
+            return false
+        } catch Error {
+            return false
+        }
+    }
+
+    static ScanPorts(host, startPort, endPort) {
+        openPorts := []
+
+        loop (endPort - startPort + 1) {
+            port := startPort + A_Index - 1
+            if (this.IsOpen(host, port, 500)) {
+                openPorts.Push(port)
+            }
+        }
+
+        return openPorts
+    }
+}
+
+; Base64 encoding
+class Base64 {
+    static Encode(text) {
+        try {
+            objXML := ComObject("MSXML2.DOMDocument")
+            objNode := objXML.CreateElement("tmp")
+            objNode.DataType := "bin.base64"
+            objNode.Text := text
+
+            return objNode.NodeTypedValue
+        } catch Error {
+            return text
+        }
+    }
+
+    static Decode(encoded) {
+        try {
+            objXML := ComObject("MSXML2.DOMDocument")
+            objNode := objXML.CreateElement("tmp")
+            objNode.DataType := "bin.base64"
+            objNode.NodeTypedValue := encoded
+
+            return objNode.Text
+        } catch Error {
+            return encoded
+        }
+    }
+}
+
+; Test Base64
+encoded := Base64.Encode("Hello World")
+MsgBox("Encoded: " . encoded)

@@ -1,0 +1,69 @@
+; Advanced Object Composition and Property Manipulation
+; Demonstrates computed properties, mixin patterns, and property descriptors
+
+; Object with computed properties
+Point := {x: 10, y: 20}
+
+; Add computed property using object protocol
+Point.magnitude => Sqrt(this.x**2 + this.y**2)
+
+; Dynamic property access with fallback
+GetProperty(obj, path, default := unset) {
+    parts := StrSplit(path, ".")
+    current := obj
+
+    for key in parts {
+        if Type(current) = "Map" {
+            current := current.Has(key) ? current[key] : default
+        } else if Type(current) = "Object" {
+            current := current.HasOwnProperty(key) ? current[key] : default
+        } else {
+            return default
+        }
+
+        if current = default
+            break
+    }
+
+    return current
+}
+
+obj := {user: {profile: {name: "Alice"}}}
+MsgBox(GetProperty(obj, "user.profile.name"))  ; Alice
+MsgBox(GetProperty(obj, "user.profile.age", "N/A"))  ; N/A
+
+; Object freezing pattern - prevent mutations
+FreezeObject(obj) {
+    for key in obj {
+        ObjDefineProperty(obj, key, {get: () => obj[key]})
+    }
+    return obj
+}
+
+; Mixin pattern - combining behaviors
+Mixin(obj, mixin) {
+    for key, value in mixin {
+        obj[key] := value
+    }
+    return obj
+}
+
+loggable := {
+    Log: (msg) => (OutputDebug(msg), MsgBox(msg)),
+    Info: (msg) => this.Log("[INFO] " . msg)
+}
+
+user := {name: "Bob"}
+Mixin(user, loggable)
+user.Info("User created")  ; Uses mixed-in methods
+
+; Computed values with caching
+CachedProperty(getter, setter := unset) {
+    cache := unset
+    isDirty := true
+
+    return {
+        Get: () => isDirty ? (cache := getter(), isDirty := false, cache) : cache,
+        Set: (value) => (cache := value, isDirty := false)
+    }
+}

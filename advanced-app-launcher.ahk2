@@ -1,0 +1,289 @@
+; Advanced Application Launcher and Registry
+; Demonstrates application management, recent apps tracking, and smart launching
+
+class ApplicationRegistry {
+    _applications := Map()
+    _recentApps := []
+    _maxRecentSize := 10
+
+    RegisterApp(name, path, icon := "", args := "") {
+        this._applications[name] := {
+            path: path,
+            icon: icon,
+            args: args,
+            lastUsed: 0,
+            launchCount: 0
+        }
+        return this
+    }
+
+    Launch(name) {
+        if (this._applications.Has(name)) {
+            app := this._applications[name]
+
+            try {
+                if (app.args != "")
+                    Run(app.path . " " . app.args)
+                else
+                    Run(app.path)
+
+                app.lastUsed := A_Now
+                app.launchCount++
+                this._AddToRecent(name)
+
+                return true
+            } catch Error as e {
+                OutputDebug("Failed to launch: " . e.Message)
+                return false
+            }
+        }
+
+        return false
+    }
+
+    LaunchOrActivate(name) {
+        if (this._applications.Has(name)) {
+            app := this._applications[name]
+            pid := ProcessExist(name)
+
+            if (pid) {
+                ; Activate existing process
+                WinActivate("ahk_pid " . pid)
+                return true
+            } else {
+                ; Launch new process
+                return this.Launch(name)
+            }
+        }
+
+        return false
+    }
+
+    _AddToRecent(name) {
+        ; Remove if already in recent
+        for idx, app in this._recentApps {
+            if (app = name) {
+                this._recentApps.RemoveAt(idx)
+                break
+            }
+        }
+
+        this._recentApps.Push(name)
+
+        if (this._recentApps.Length > this._maxRecentSize) {
+            this._recentApps.RemoveAt(1)
+        }
+    }
+
+    GetRecentApps() {
+        return this._recentApps.Clone()
+    }
+
+    GetAppInfo(name) {
+        return this._applications.Has(name) ? this._applications[name] : ""
+    }
+
+    GetTopApps(count := 5) {
+        apps := []
+        for name, info in this._applications {
+            apps.Push({name, launchCount: info.launchCount})
+        }
+
+        ; Sort by launch count
+        loop (apps.Length - 1) {
+            minIdx := A_Index
+            loop (apps.Length - A_Index) {
+                if (apps[A_Index + minIdx - 1].launchCount < apps[minIdx].launchCount) {
+                    minIdx := A_Index + minIdx - 1
+                }
+            }
+
+            temp := apps[A_Index]
+            apps[A_Index] := apps[minIdx]
+            apps[minIdx] := temp
+        }
+
+        result := []
+        loop Min(count, apps.Length) {
+            result.Push(apps[A_Index].name)
+        }
+
+        return result
+    }
+
+    Min(a, b) => a < b ? a : b
+}
+
+registry := ApplicationRegistry()
+registry.RegisterApp("notepad", "notepad.exe")
+registry.RegisterApp("calc", "calc.exe")
+registry.RegisterApp("explorer", "explorer.exe", , "C:\")
+
+; Smart app launcher with fuzzy matching
+class SmartLauncher {
+    _registry := ""
+
+    __New(registry) {
+        this._registry := registry
+    }
+
+    Launch(query) {
+        ; Try exact match first
+        if (this._registry.GetAppInfo(query)) {
+            return this._registry.Launch(query)
+        }
+
+        ; Try case-insensitive match
+        for app in this._registry._applications {
+            if (StrLower(app) = StrLower(query)) {
+                return this._registry.Launch(app)
+            }
+        }
+
+        ; Try fuzzy matching
+        match := this._FindFuzzyMatch(query)
+        if (match) {
+            return this._registry.Launch(match)
+        }
+
+        return false
+    }
+
+    _FindFuzzyMatch(query) {
+        lowerQuery := StrLower(query)
+        bestMatch := ""
+        bestScore := 0
+
+        for name in this._registry._applications {
+            score := this._CalculateSimilarity(lowerQuery, StrLower(name))
+
+            if (score > bestScore) {
+                bestScore := score
+                bestMatch := name
+            }
+        }
+
+        return bestScore > 0.5 ? bestMatch : ""
+    }
+
+    _CalculateSimilarity(query, target) {
+        if (target = query)
+            return 1.0
+
+        if (InStr(target, query))
+            return 0.8
+
+        matching := 0
+        loop StrLen(query) {
+            if (InStr(target, SubStr(query, A_Index, 1)))
+                matching++
+        }
+
+        return matching / StrLen(query)
+    }
+}
+
+smartLauncher := SmartLauncher(registry)
+
+; Application manager
+class ApplicationManager {
+    _pinned := []
+    _favorites := []
+
+    __New(registry) {
+        this._registry := registry
+    }
+
+    Pin(name) {
+        if (!this._PinnedContains(name)) {
+            this._pinned.Push(name)
+        }
+        return this
+    }
+
+    Unpin(name) {
+        for idx, app in this._pinned {
+            if (app = name) {
+                this._pinned.RemoveAt(idx)
+                break
+            }
+        }
+        return this
+    }
+
+    AddToFavorites(name) {
+        if (!this._FavoritesContains(name)) {
+            this._favorites.Push(name)
+        }
+        return this
+    }
+
+    RemoveFromFavorites(name) {
+        for idx, app in this._favorites {
+            if (app = name) {
+                this._favorites.RemoveAt(idx)
+                break
+            }
+        }
+        return this
+    }
+
+    GetPinned() {
+        return this._pinned.Clone()
+    }
+
+    GetFavorites() {
+        return this._favorites.Clone()
+    }
+
+    _PinnedContains(name) {
+        for app in this._pinned {
+            if (app = name)
+                return true
+        }
+        return false
+    }
+
+    _FavoritesContains(name) {
+        for app in this._favorites {
+            if (app = name)
+                return true
+        }
+        return false
+    }
+}
+
+appMgr := ApplicationManager(registry)
+appMgr.Pin("notepad")
+appMgr.AddToFavorites("calc")
+
+MsgBox("Pinned: " . appMgr.GetPinned().Length)
+MsgBox("Favorites: " . appMgr.GetFavorites().Length)
+
+; Batch app launcher
+class BatchLauncher {
+    _queue := []
+
+    AddApp(name) {
+        this._queue.Push(name)
+        return this
+    }
+
+    LaunchAll(delayMs := 500) {
+        for app in this._queue {
+            registry.Launch(app)
+            Sleep(delayMs)
+        }
+        return this
+    }
+
+    Clear() {
+        this._queue := []
+        return this
+    }
+}
+
+batch := BatchLauncher()
+batch.AddApp("notepad")
+batch.AddApp("calc")
+; batch.LaunchAll(500)

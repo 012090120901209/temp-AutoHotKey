@@ -1,0 +1,104 @@
+; Advanced Collection Patterns and Data Structures
+; Demonstrates queues, stacks, and specialized collections
+
+; Stack implementation using array
+Stack() {
+    return {
+        items: [],
+        Push: (item) => this.items.Push(item),
+        Pop: () => this.items.Length > 0 ? this.items.Pop() : unset,
+        Peek: () => this.items.Length > 0 ? this.items[-1] : unset,
+        IsEmpty: () => this.items.Length = 0,
+        Size: () => this.items.Length,
+        Clear: () => this.items := []
+    }
+}
+
+stack := Stack()
+stack.Push(1)
+stack.Push(2)
+stack.Push(3)
+MsgBox(stack.Pop() . " popped, size: " . stack.Size())  ; 3 popped, size: 2
+
+; Queue implementation using array
+Queue() {
+    return {
+        items: [],
+        Enqueue: (item) => this.items.Push(item),
+        Dequeue: () => this.items.Length > 0 ? this.items.RemoveAt(1) : unset,
+        Peek: () => this.items.Length > 0 ? this.items[1] : unset,
+        IsEmpty: () => this.items.Length = 0,
+        Size: () => this.items.Length
+    }
+}
+
+queue := Queue()
+queue.Enqueue("first")
+queue.Enqueue("second")
+queue.Enqueue("third")
+MsgBox(queue.Dequeue() " dequeued")  ; first dequeued
+
+; Set implementation using map
+Set(initialItems := []) {
+    return {
+        items: Map(),
+        Add: (item) => this.items[item] := true,
+        Has: (item) => this.items.Has(item),
+        Remove: (item) => this.items.Delete(item),
+        Clear: () => this.items := Map(),
+        ToArray: () => Array(this.items*),
+        Size: () => this.items.Count(),
+        _Init: (items) => (loop (items.Length) this.Add(items[A_Index]), this),
+        __New: () => this._Init(initialItems)
+    }
+}
+
+set := Set([1, 2, 3, 3, 4, 4, 4])
+MsgBox("Set size: " . set.Size())  ; 4 (duplicates removed)
+
+; Priority queue with comparator
+PriorityQueue(compareFn) {
+    return {
+        items: [],
+        Enqueue: (item, priority) => this._InsertSorted({item, priority}),
+        Dequeue: () => this.items.Length > 0 ? this.items.RemoveAt(1).item : unset,
+        IsEmpty: () => this.items.Length = 0,
+        _InsertSorted: (entry) => (
+            loop (this.items.Length + 1) {
+                if (A_Index > this.items.Length ||
+                    compareFn(entry.priority, this.items[A_Index].priority) < 0) {
+                    this.items.InsertAt(A_Index, entry)
+                    return
+                }
+            }
+        )
+    }
+}
+
+pq := PriorityQueue((a, b) => a > b ? 1 : (a < b ? -1 : 0))
+pq.Enqueue("low", 3)
+pq.Enqueue("high", 1)
+pq.Enqueue("medium", 2)
+MsgBox(pq.Dequeue())  ; high (priority 1)
+
+; Range/interval collection
+Range(start, end, step := 1) {
+    result := []
+    current := start
+
+    if (step > 0) {
+        while (current <= end) {
+            result.Push(current)
+            current += step
+        }
+    } else if (step < 0) {
+        while (current >= end) {
+            result.Push(current)
+            current += step
+        }
+    }
+
+    return result
+}
+
+MsgBox(Range(1, 10, 2).Length . " numbers in range")  ; 5 numbers

@@ -1,0 +1,374 @@
+; Advanced Text Parsing and Pattern Matching
+; Demonstrates parsing, pattern extraction, and text analysis
+
+class TextParser {
+    _text := ""
+    _position := 1
+
+    __New(text := "") {
+        this._text := text
+    }
+
+    SetText(text) {
+        this._text := text
+        this._position := 1
+        return this
+    }
+
+    Peek(length := 1) {
+        return SubStr(this._text, this._position, length)
+    }
+
+    Read(length := 1) {
+        result := SubStr(this._text, this._position, length)
+        this._position += length
+        return result
+    }
+
+    ReadUntil(delimiter) {
+        pos := InStr(this._text, delimiter, , this._position)
+
+        if (pos = 0)
+            return this.ReadAll()
+
+        result := SubStr(this._text, this._position, pos - this._position)
+        this._position := pos + StrLen(delimiter)
+
+        return result
+    }
+
+    ReadAll() {
+        result := SubStr(this._text, this._position)
+        this._position := StrLen(this._text) + 1
+        return result
+    }
+
+    Skip(length := 1) {
+        this._position += length
+        return this
+    }
+
+    SkipWhitespace() {
+        loop {
+            char := this.Peek()
+            if (char != " " && char != "`t" && char != "`n" && char != "`r")
+                break
+            this._position++
+        }
+        return this
+    }
+
+    IsAtEnd() {
+        return this._position > StrLen(this._text)
+    }
+
+    GetPosition() {
+        return this._position
+    }
+
+    Rewind(length := 1) {
+        this._position := Max(1, this._position - length)
+        return this
+    }
+
+    Max(a, b) => a > b ? a : b
+}
+
+parser := TextParser("Hello, World!")
+MsgBox(parser.Read(5))  ; Hello
+parser.Skip(2)
+MsgBox(parser.ReadAll())  ; World!
+
+; Pattern matcher
+class PatternMatcher {
+    _patterns := []
+
+    AddPattern(pattern, name := "") {
+        this._patterns.Push({pattern, name})
+        return this
+    }
+
+    Match(text) {
+        results := []
+
+        for patternObj in this._patterns {
+            pos := 1
+            while (pos := RegExMatch(text, patternObj.pattern, match, pos)) {
+                results.Push({
+                    name: patternObj.name,
+                    match: match[0],
+                    position: pos,
+                    groups: match
+                })
+                pos += StrLen(match[0])
+            }
+        }
+
+        return results
+    }
+
+    FindFirst(text) {
+        pos := 1
+        bestMatch := ""
+        bestPos := Infinity
+
+        for patternObj in this._patterns {
+            matchPos := RegExMatch(text, patternObj.pattern)
+
+            if (matchPos > 0 && matchPos < bestPos) {
+                bestPos := matchPos
+                bestMatch := patternObj
+            }
+        }
+
+        return bestMatch != "" ? bestMatch : ""
+    }
+}
+
+matcher := PatternMatcher()
+matcher.AddPattern("\d+", "number")
+matcher.AddPattern("[A-Za-z]+", "word")
+matcher.AddPattern("[\w\.]+@[\w\.]+", "email")
+
+results := matcher.Match("Contact: john@example.com at 123")
+MsgBox("Found " . results.Length . " matches")
+
+; CSV parser
+class CSVParser {
+    _delimiter := ","
+    _quote := """"
+
+    __New(delimiter := ",") {
+        this._delimiter := delimiter
+    }
+
+    Parse(csvText) {
+        lines := StrSplit(csvText, "`n")
+        rows := []
+
+        for line in lines {
+            line := StrTrim(line)
+            if (line != "") {
+                rows.Push(this._ParseLine(line))
+            }
+        }
+
+        return rows
+    }
+
+    _ParseLine(line) {
+        fields := []
+        current := ""
+        inQuotes := false
+        i := 1
+
+        loop StrLen(line) {
+            char := SubStr(line, i, 1)
+
+            if (char = this._quote) {
+                if (inQuotes && SubStr(line, i + 1, 1) = this._quote) {
+                    current .= this._quote
+                    i++
+                } else {
+                    inQuotes := !inQuotes
+                }
+            } else if (char = this._delimiter && !inQuotes) {
+                fields.Push(current)
+                current := ""
+            } else {
+                current .= char
+            }
+
+            i++
+        }
+
+        fields.Push(current)
+        return fields
+    }
+
+    ToString(rows) {
+        lines := []
+
+        for row in rows {
+            fields := []
+            for field in row {
+                if (InStr(field, this._delimiter)) {
+                    field := this._quote . field . this._quote
+                }
+                fields.Push(field)
+            }
+            lines.Push(StrJoin(this._delimiter, fields))
+        }
+
+        return StrJoin("`n", lines)
+    }
+}
+
+StrJoin(sep, arr) {
+    result := ""
+    for item in arr
+        result .= (result ? sep : "") . item
+    return result
+}
+
+csv := CSVParser()
+parsed := csv.Parse("Name,Age,Email`nJohn,30,john@example.com`nJane,25,jane@example.com")
+MsgBox("Rows: " . parsed.Length)
+
+; JSON-like parser
+class JSONParser {
+    _text := ""
+    _position := 1
+
+    Parse(jsonText) {
+        this._text := jsonText
+        this._position := 1
+        this._SkipWhitespace()
+
+        return this._ParseValue()
+    }
+
+    _ParseValue() {
+        this._SkipWhitespace()
+        char := SubStr(this._text, this._position, 1)
+
+        switch char {
+            case "{":
+                return this._ParseObject()
+            case "[":
+                return this._ParseArray()
+            case """":
+                return this._ParseString()
+            case "t":
+            case "f":
+                return this._ParseBoolean()
+            case "n":
+                return this._ParseNull()
+            default:
+                return this._ParseNumber()
+        }
+    }
+
+    _ParseObject() {
+        obj := Map()
+        this._position++  ; Skip {
+        this._SkipWhitespace()
+
+        if (SubStr(this._text, this._position, 1) = "}") {
+            this._position++
+            return obj
+        }
+
+        loop {
+            this._SkipWhitespace()
+            key := this._ParseString()
+            this._SkipWhitespace()
+
+            this._position++  ; Skip :
+
+            value := this._ParseValue()
+            obj[key] := value
+
+            this._SkipWhitespace()
+
+            if (SubStr(this._text, this._position, 1) = "}") {
+                this._position++
+                break
+            }
+
+            this._position++  ; Skip comma
+        }
+
+        return obj
+    }
+
+    _ParseArray() {
+        arr := []
+        this._position++  ; Skip [
+
+        loop {
+            this._SkipWhitespace()
+
+            if (SubStr(this._text, this._position, 1) = "]") {
+                this._position++
+                break
+            }
+
+            arr.Push(this._ParseValue())
+            this._SkipWhitespace()
+
+            if (SubStr(this._text, this._position, 1) = "]") {
+                this._position++
+                break
+            }
+
+            this._position++  ; Skip comma
+        }
+
+        return arr
+    }
+
+    _ParseString() {
+        this._position++  ; Skip quote
+        result := ""
+
+        loop {
+            char := SubStr(this._text, this._position, 1)
+
+            if (char = """") {
+                this._position++
+                break
+            }
+
+            result .= char
+            this._position++
+        }
+
+        return result
+    }
+
+    _ParseNumber() {
+        start := this._position
+
+        loop {
+            char := SubStr(this._text, this._position, 1)
+            if (char ~= "[0-9.\-+eE]") {
+                this._position++
+            } else {
+                break
+            }
+        }
+
+        return SubStr(this._text, start, this._position - start) + 0
+    }
+
+    _ParseBoolean() {
+        if (SubStr(this._text, this._position, 4) = "true") {
+            this._position += 4
+            return true
+        } else {
+            this._position += 5
+            return false
+        }
+    }
+
+    _ParseNull() {
+        this._position += 4
+        return ""
+    }
+
+    _SkipWhitespace() {
+        loop {
+            char := SubStr(this._text, this._position, 1)
+            if (char ~= "[ `t`n`r]") {
+                this._position++
+            } else {
+                break
+            }
+        }
+    }
+}
+
+jsonParser := JSONParser()
+result := jsonParser.Parse('{"name":"John","age":30}')
+MsgBox("Parsed object")

@@ -1,0 +1,213 @@
+; Advanced Hotkey Dispatcher with Priority and Fallback
+; Demonstrates hotkey routing, priority handling, and fallback chains
+
+class HotkeyDispatcher {
+    _routes := []
+    _globalFallback := unset
+    _enabled := true
+
+    Register(pattern, handler, priority := 0) {
+        this._routes.Push({pattern, handler, priority})
+        ; Sort by priority (higher first)
+        this._SortByPriority()
+    }
+
+    SetGlobalFallback(handler) {
+        this._globalFallback := handler
+    }
+
+    Dispatch(hotkey) {
+        if (!this._enabled)
+            return
+
+        for route in this._routes {
+            if (this._PatternMatch(route.pattern, hotkey)) {
+                result := route.handler(hotkey)
+                if (result != unset)
+                    return result
+            }
+        }
+
+        if (this._globalFallback != unset) {
+            return this._globalFallback(hotkey)
+        }
+    }
+
+    Enable() {
+        this._enabled := true
+    }
+
+    Disable() {
+        this._enabled := false
+    }
+
+    _PatternMatch(pattern, hotkey) {
+        if (pattern = "*") {
+            return true
+        }
+        if (pattern = hotkey) {
+            return true
+        }
+        if (SubStr(pattern, 1, 1) = "^") {
+            regex := SubStr(pattern, 2)
+            return RegExMatch(hotkey, regex)
+        }
+        return false
+    }
+
+    _SortByPriority() {
+        loop (this._routes.Length - 1) {
+            minIdx := A_Index
+            loop (this._routes.Length - A_Index) {
+                if (this._routes[A_Index + minIdx - 1].priority <
+                    this._routes[minIdx].priority) {
+                    minIdx := A_Index + minIdx - 1
+                }
+            }
+
+            temp := this._routes[A_Index]
+            this._routes[A_Index] := this._routes[minIdx]
+            this._routes[minIdx] := temp
+        }
+    }
+}
+
+dispatcher := HotkeyDispatcher()
+
+; Register specific hotkeys with high priority
+dispatcher.Register("!+e", (hk) => (
+    OutputDebug("Alt+Shift+E: Edit"),
+    "handled"
+), 100)
+
+dispatcher.Register("!+s", (hk) => (
+    OutputDebug("Alt+Shift+S: Save"),
+    "handled"
+), 100)
+
+; Register pattern-based routes with medium priority
+dispatcher.Register("^!.*", (hk) => (
+    OutputDebug("Any Alt+Ctrl combination: " . hk),
+    "handled"
+), 50)
+
+; Global fallback for unhandled hotkeys
+dispatcher.SetGlobalFallback((hk) => (
+    OutputDebug("Unhandled hotkey: " . hk),
+    "unhandled"
+))
+
+; Test dispatcher
+dispatcher.Dispatch("!+e")
+dispatcher.Dispatch("!+s")
+dispatcher.Dispatch("!+a")  ; Unhandled
+
+; Context-aware dispatcher
+class ContextualDispatcher extends HotkeyDispatcher {
+    _context := "default"
+    _contextRoutes := Map()
+
+    SetContext(context) {
+        this._context := context
+    }
+
+    RegisterForContext(context, pattern, handler, priority := 0) {
+        if (!this._contextRoutes.Has(context))
+            this._contextRoutes[context] := []
+
+        routes := this._contextRoutes[context]
+        routes.Push({pattern, handler, priority})
+    }
+
+    Dispatch(hotkey) {
+        ; Check context-specific routes first
+        if (this._contextRoutes.Has(this._context)) {
+            for route in this._contextRoutes[this._context] {
+                if (this._PatternMatch(route.pattern, hotkey)) {
+                    result := route.handler(hotkey)
+                    if (result != unset)
+                        return result
+                }
+            }
+        }
+
+        ; Fall back to global routes
+        return super.Dispatch(hotkey)
+    }
+}
+
+contextDispatcher := ContextualDispatcher()
+
+; Register global hotkey
+contextDispatcher.Register("!+e", (hk) => "Global Edit", 50)
+
+; Register context-specific hotkey
+contextDispatcher.RegisterForContext("editor", "!+e",
+    (hk) => (OutputDebug("Editor-specific edit"), "handled"), 100)
+
+contextDispatcher.Dispatch("!+e")  ; Uses global
+
+contextDispatcher.SetContext("editor")
+contextDispatcher.Dispatch("!+e")  ; Uses editor-specific
+
+; Conditional hotkey dispatcher
+class ConditionalDispatcher {
+    _routes := []
+
+    Register(condition, handler) {
+        this._routes.Push({condition, handler})
+    }
+
+    Dispatch(data) {
+        for route in this._routes {
+            if (route.condition(data)) {
+                return route.handler(data)
+            }
+        }
+    }
+}
+
+condDispatcher := ConditionalDispatcher()
+
+condDispatcher.Register(
+    (d) => d.type = "click",
+    (d) => ("Click at: " . d.x . "," . d.y)
+)
+
+condDispatcher.Register(
+    (d) => d.type = "key",
+    (d) => ("Key pressed: " . d.key)
+)
+
+MsgBox(condDispatcher.Dispatch({type: "click", x: 100, y: 200}))
+MsgBox(condDispatcher.Dispatch({type: "key", key: "Enter"}))
+
+; Rate-limited dispatcher
+class RateLimitedDispatcher {
+    _lastExecution := Map()
+    _minInterval := 100
+
+    __New(minInterval := 100) {
+        this._minInterval := minInterval
+    }
+
+    Execute(key, handler) {
+        now := A_TickCount
+        lastTime := this._lastExecution.Has(key) ? this._lastExecution[key] : 0
+
+        if (now - lastTime >= this._minInterval) {
+            this._lastExecution[key] := now
+            return handler()
+        }
+    }
+}
+
+rateLimited := RateLimitedDispatcher(200)
+
+loop 5 {
+    result := rateLimited.Execute("action", () => (
+        OutputDebug("Executed at " . A_TickCount),
+        "Done"
+    ))
+    Sleep(50)
+}
