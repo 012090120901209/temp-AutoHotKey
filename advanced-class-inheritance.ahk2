@@ -1,0 +1,137 @@
+; Advanced Class Inheritance and Polymorphism
+; Demonstrates inheritance hierarchies, method overriding, and super calls
+
+class Animal {
+    name := ""
+    age := 0
+
+    __New(name, age) {
+        this.name := name
+        this.age := age
+    }
+
+    Speak() {
+        return this.name . " makes a sound"
+    }
+
+    GetInfo() {
+        return this.name . " is " . this.age . " years old"
+    }
+}
+
+class Dog extends Animal {
+    breed := ""
+
+    __New(name, age, breed) {
+        super.__New(name, age)
+        this.breed := breed
+    }
+
+    Speak() {
+        return this.name . " barks!"
+    }
+
+    GetInfo() {
+        return super.GetInfo() . " and is a " . this.breed
+    }
+
+    Fetch() {
+        return this.name . " fetches the ball"
+    }
+}
+
+class Cat extends Animal {
+    indoor := true
+
+    Speak() {
+        return this.name . " meows"
+    }
+}
+
+; Polymorphic behavior
+animals := [
+    Dog("Buddy", 3, "Golden Retriever"),
+    Cat("Whiskers", 2),
+    Animal("Generic", 5)
+]
+
+for animal in animals {
+    MsgBox(animal.Speak())
+    MsgBox(animal.GetInfo())
+}
+
+; Method resolution order and super
+class Vehicle {
+    wheels := 0
+
+    GetDescription() {
+        return "Vehicle with " . this.wheels . " wheels"
+    }
+}
+
+class Car extends Vehicle {
+    doors := 0
+
+    __New(wheels, doors) {
+        this.wheels := wheels
+        this.doors := doors
+    }
+
+    GetDescription() {
+        return super.GetDescription() . " and " . this.doors . " doors"
+    }
+}
+
+car := Car(4, 4)
+MsgBox(car.GetDescription())  ; Vehicle with 4 wheels and 4 doors
+
+; Abstract base class pattern
+class Shape {
+    Color := ""
+
+    __New(color) {
+        this.Color := color
+    }
+
+    Area() {
+        throw Error("Must implement Area() in subclass")
+    }
+
+    GetDescription() {
+        return "Shape with color: " . this.Color
+    }
+}
+
+class Circle extends Shape {
+    Radius := 0
+
+    __New(color, radius) {
+        super.__New(color)
+        this.Radius := radius
+    }
+
+    Area() {
+        return 3.14159 * this.Radius ** 2
+    }
+}
+
+class Rectangle extends Shape {
+    Width := 0
+    Height := 0
+
+    __New(color, width, height) {
+        super.__New(color)
+        this.Width := width
+        this.Height := height
+    }
+
+    Area() {
+        return this.Width * this.Height
+    }
+}
+
+circle := Circle("Red", 5)
+rect := Rectangle("Blue", 4, 6)
+
+MsgBox("Circle area: " . Format("{:.2f}", circle.Area()))
+MsgBox("Rectangle area: " . Format("{:.2f}", rect.Area()))

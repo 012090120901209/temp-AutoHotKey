@@ -1,0 +1,35 @@
+; Advanced Type Coercion and Type Safety
+; Demonstrates implicit/explicit type conversion with edge cases
+
+; Numeric coercion edge cases
+numStr := "42.5"
+num := numStr + 0  ; Implicit coercion to number
+MsgBox(num . " (type: " . Type(num) . ")")  ; 42.5 (type: Float)
+
+; Boolean coercion and truthiness
+emptyStr := ""
+filledStr := "hello"
+MsgBox(!!emptyStr " = false, " . !!filledStr " = true")  ; 0 = false, 1 = true
+
+; Numeric string comparison
+if ("10" = 10)  ; String "10" compared to number 10
+    MsgBox("Numeric strings are equal to their numeric equivalents")
+
+; Type-safe arithmetic with default fallback
+SafeAdd(a, b, default := 0) {
+    aNum := IsNumber(a) ? a : (IsNumber(a + 0) ? a + 0 : default)
+    bNum := IsNumber(b) ? b : (IsNumber(b + 0) ? b + 0 : default)
+    return aNum + bNum
+}
+
+result := SafeAdd("5", "10")  ; Returns 15
+result2 := SafeAdd("abc", "10")  ; Returns 10 (uses default)
+MsgBox(result . " and " . result2)
+
+; Nullish coalescing pattern (value ?? default)
+GetValue(key, defaults := Map()) {
+    return defaults.Has(key) && defaults[key] != "" ? defaults[key] : "N/A"
+}
+
+defaults := Map("name", "John", "age", "")
+MsgBox(GetValue("name", defaults) . " and " . GetValue("age", defaults))

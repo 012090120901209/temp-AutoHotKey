@@ -1,0 +1,85 @@
+; Advanced Array Operations and Functional Programming
+; Demonstrates filter, map, reduce, and other functional array methods
+
+; Array filtering with predicates
+Filter(arr, predicate) {
+    result := []
+    for item in arr {
+        if (predicate(item))
+            result.Push(item)
+    }
+    return result
+}
+
+numbers := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+evens := Filter(numbers, (n) => Mod(n, 2) = 0)
+MsgBox(evens.Length . " even numbers found")  ; 5
+
+; Array transformation with map
+Map(arr, transformer) {
+    result := []
+    for item in arr {
+        result.Push(transformer(item))
+    }
+    return result
+}
+
+doubled := Map(numbers, (n) => n * 2)
+MsgBox(doubled[1] . ", " . doubled[2] . ", " . doubled[3])  ; 2, 4, 6
+
+; Array reduction/folding
+Reduce(arr, accumulator, initial := unset) {
+    if (initial = unset && arr.Length > 0) {
+        result := arr[1]
+        startIdx := 2
+    } else {
+        result := initial
+        startIdx := 1
+    }
+
+    loop (arr.Length - (initial = unset && arr.Length > 0 ? 1 : 0)) {
+        result := accumulator(result, arr[startIdx])
+        startIdx++
+    }
+
+    return result
+}
+
+sum := Reduce(numbers, (acc, n) => acc + n, 0)
+product := Reduce(numbers, (acc, n) => acc * n, 1)
+MsgBox("Sum: " . sum . ", Product: " . product)
+
+; Array partitioning
+Partition(arr, predicate) {
+    left := [], right := []
+    for item in arr {
+        if (predicate(item))
+            left.Push(item)
+        else
+            right.Push(item)
+    }
+    return [left, right]
+}
+
+[passed, failed] := Partition(numbers, (n) => n > 5)
+MsgBox("Passed: " . passed.Length . ", Failed: " . failed.Length)
+
+; Array deduplication
+Unique(arr) {
+    seen := Map()
+    result := []
+
+    for item in arr {
+        key := Type(item) = "Object" ? String(item) : item
+        if (!seen.Has(key)) {
+            result.Push(item)
+            seen[key] := true
+        }
+    }
+
+    return result
+}
+
+duplicates := [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
+unique := Unique(duplicates)
+MsgBox(unique.Length . " unique values from " . duplicates.Length)  ; 4 unique values

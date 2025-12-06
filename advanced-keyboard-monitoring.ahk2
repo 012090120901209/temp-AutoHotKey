@@ -1,0 +1,226 @@
+; Advanced Keyboard Monitoring and State Tracking
+; Demonstrates key state tracking, press/release handling, and keyboard state management
+
+; Keyboard state tracker
+class KeyboardMonitor {
+    _keyStates := Map()
+    _pressHandlers := Map()
+    _releaseHandlers := Map()
+
+    RegisterPressHandler(key, handler) {
+        if (!this._pressHandlers.Has(key))
+            this._pressHandlers[key] := []
+        this._pressHandlers[key].Push(handler)
+    }
+
+    RegisterReleaseHandler(key, handler) {
+        if (!this._releaseHandlers.Has(key))
+            this._releaseHandlers[key] := []
+        this._releaseHandlers[key].Push(handler)
+    }
+
+    OnKeyPress(key) {
+        if (this._keyStates.Has(key) && this._keyStates[key]) {
+            return  ; Already pressed
+        }
+
+        this._keyStates[key] := true
+
+        if (this._pressHandlers.Has(key)) {
+            for handler in this._pressHandlers[key] {
+                handler()
+            }
+        }
+    }
+
+    OnKeyRelease(key) {
+        this._keyStates[key] := false
+
+        if (this._releaseHandlers.Has(key)) {
+            for handler in this._releaseHandlers[key] {
+                handler()
+            }
+        }
+    }
+
+    IsPressed(key) {
+        return this._keyStates.Has(key) && this._keyStates[key]
+    }
+
+    GetPressedKeys() {
+        pressed := []
+        for key, state in this._keyStates {
+            if (state)
+                pressed.Push(key)
+        }
+        return pressed
+    }
+}
+
+kb := KeyboardMonitor()
+
+kb.RegisterPressHandler("a", () => OutputDebug("A pressed"))
+kb.RegisterReleaseHandler("a", () => OutputDebug("A released"))
+
+; Simulate key events
+kb.OnKeyPress("a")
+kb.OnKeyRelease("a")
+
+; Long press detection
+class LongPressDetector {
+    _timerId := ""
+    _pressed := false
+    _duration := 0
+
+    OnKeyPress(duration, handler) {
+        this._duration := duration
+        this._pressed := true
+
+        this._timerId := SetTimer(() => {
+            if (this._pressed) {
+                handler()
+            }
+        }, duration, 1)
+    }
+
+    OnKeyRelease() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+        }
+        this._pressed := false
+    }
+}
+
+longPress := LongPressDetector()
+
+longPress.OnKeyPress(1000, () => MsgBox("Key held for 1 second"))
+
+; Rapid key detection
+class RapidKeyDetector {
+    _lastPressTime := 0
+    _pressCount := 0
+    _threshold := 300  ; milliseconds
+    _requiredCount := 3
+
+    OnKeyPress() {
+        now := A_TickCount
+
+        if (now - this._lastPressTime > this._threshold) {
+            this._pressCount := 0
+        }
+
+        this._pressCount++
+        this._lastPressTime := now
+
+        return this._pressCount >= this._requiredCount
+    }
+
+    Reset() {
+        this._pressCount := 0
+    }
+}
+
+rapid := RapidKeyDetector()
+
+; Simulate triple tap
+loop 3 {
+    if (rapid.OnKeyPress()) {
+        MsgBox("Triple tap detected!")
+        rapid.Reset()
+    }
+}
+
+; Key combination tracker
+class KeyCombo {
+    _required := []
+    _pressed := []
+    _timeout := 500
+    _lastKeyTime := 0
+    _handler := ""
+
+    __New(keys, handler, timeout := 500) {
+        this._required := keys
+        this._handler := handler
+        this._timeout := timeout
+    }
+
+    OnKeyPress(key) {
+        now := A_TickCount
+
+        if (this._lastKeyTime && now - this._lastKeyTime > this._timeout) {
+            this._pressed := []
+        }
+
+        this._pressed.Push(key)
+        this._lastKeyTime := now
+
+        if (this._IsMatch()) {
+            this._handler()
+            this._pressed := []
+        }
+    }
+
+    _IsMatch() {
+        if (this._pressed.Length != this._required.Length)
+            return false
+
+        for idx, key in this._required {
+            if (this._pressed[idx] != key)
+                return false
+        }
+
+        return true
+    }
+}
+
+combo := KeyCombo(["q", "w", "e"], () => MsgBox("Combo matched!"), 1000)
+
+combo.OnKeyPress("q")
+combo.OnKeyPress("w")
+combo.OnKeyPress("e")  ; Triggers handler
+
+; Key state visualization
+ShowKeyStates() {
+    states := ""
+
+    keyMap := Map(
+        "a", GetKeyState("a"),
+        "b", GetKeyState("b"),
+        "c", GetKeyState("c")
+    )
+
+    for key, state in keyMap {
+        states .= key . ": " . (state ? "▼" : "▲") . "`n"
+    }
+
+    MsgBox(states)
+}
+
+; Key repeat handler
+class KeyRepeatHandler {
+    _repeatRate := 50
+    _timerId := ""
+
+    OnKeyDown(handler) {
+        this._timerId := SetTimer(handler, this._repeatRate)
+    }
+
+    OnKeyUp() {
+        if (this._timerId) {
+            SetTimer(this._timerId, 0)
+            this._timerId := ""
+        }
+    }
+
+    SetRepeatRate(rate) {
+        this._repeatRate := rate
+    }
+}
+
+repeat := KeyRepeatHandler()
+repeatCount := 0
+
+repeat.OnKeyDown(() => (repeatCount++, OutputDebug("Repeat: " . repeatCount)))
+Sleep(250)
+repeat.OnKeyUp()
+MsgBox("Repeated " . repeatCount . " times")

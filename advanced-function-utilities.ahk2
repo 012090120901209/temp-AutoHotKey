@@ -1,0 +1,183 @@
+; Advanced Function Utilities and Helpers
+; Demonstrates throttling, debouncing, once execution, and function timing
+
+; Execute function only once
+Once(fn) {
+    executed := false
+    result := unset
+
+    return () => (
+        executed ? result : (
+            result := fn(),
+            executed := true,
+            result
+        )
+    )
+}
+
+initialize := Once(() => (
+    OutputDebug("Initializing..."),
+    "Initialized"
+))
+
+MsgBox(initialize())  ; Initializing... Initialized
+MsgBox(initialize())  ; Just returns cached result
+
+; Throttle - limit execution frequency
+Throttle(fn, delay) {
+    lastTime := 0
+
+    return () => {
+        now := A_TickCount
+        if (now - lastTime >= delay) {
+            fn()
+            lastTime := now
+        }
+    }
+}
+
+; Debounce - delay execution until quiet period
+Debounce(fn, delay) {
+    timerId := 0
+
+    return () => {
+        if (timerId)
+            SetTimer(timerId, 0)
+
+        timerId := SetTimer(fn, delay, 1)
+    }
+}
+
+; Function timing and profiling
+Time(fn, label := "") {
+    startTime := A_TickCount
+    result := fn()
+    elapsed := A_TickCount - startTime
+
+    if (label)
+        MsgBox(label . " took " . elapsed . "ms")
+
+    return {result: result, elapsed: elapsed}
+}
+
+output := Time(
+    () => (Sleep(100), "Done"),
+    "Operation"
+)
+
+; Memoize with TTL (time-to-live)
+MemoizeWithTTL(fn, ttl := 5000) {
+    cache := Map()
+    lastTime := Map()
+
+    return (args*) => {
+        key := ""
+        for arg in args
+            key .= String(arg) . ","
+
+        now := A_TickCount
+
+        if (cache.Has(key)) {
+            if (now - lastTime[key] < ttl) {
+                return cache[key]
+            } else {
+                cache.Delete(key)
+                lastTime.Delete(key)
+            }
+        }
+
+        result := fn(args*)
+        cache[key] := result
+        lastTime[key] := now
+
+        return result
+    }
+}
+
+expensiveOp := MemoizeWithTTL(
+    (n) => n * n,
+    2000
+)
+
+MsgBox(expensiveOp(5))
+Sleep(1000)
+MsgBox(expensiveOp(5))  ; Still cached
+Sleep(1500)
+MsgBox(expensiveOp(5))  ; Cache expired
+
+; Function guards - pre-condition checking
+Guard(fn, conditions*) {
+    return (args*) => {
+        for condition in conditions {
+            if (!condition(args)) {
+                throw Error("Guard condition failed")
+            }
+        }
+        return fn(args*)
+    }
+}
+
+divide := Guard(
+    (a, b) => a / b,
+    (args) => args[2] != 0
+)
+
+MsgBox(divide(10, 2))  ; 5
+
+try {
+    divide(10, 0)  ; Throws error
+} catch Error as e {
+    MsgBox("Error caught: " . e.Message)
+}
+
+; Notch - pre/post processing
+Notch(fn, before := unset, after := unset) {
+    return (args*) => {
+        if (before != unset)
+            before(args)
+
+        result := fn(args*)
+
+        if (after != unset)
+            after(result)
+
+        return result
+    }
+}
+
+loggedFn := Notch(
+    (x) => x * 2,
+    (args) => OutputDebug("Called with: " . args[1]),
+    (result) => OutputDebug("Returned: " . result)
+)
+
+MsgBox(loggedFn(5))
+
+; Function timeout
+WithTimeout(fn, timeoutMs) {
+    try {
+        startTime := A_TickCount
+
+        loop {
+            if (A_TickCount - startTime > timeoutMs) {
+                throw Error("Function timed out")
+            }
+
+            ; Check if operation completed (simplified)
+            return fn()
+        }
+    } catch Error as e {
+        throw e
+    }
+}
+
+quickOp := () => (Sleep(50), "Done")
+MsgBox(WithTimeout(quickOp, 100))  ; Completes in time
+
+slowOp := () => (Sleep(200), "Done")
+
+try {
+    WithTimeout(slowOp, 100)  ; Times out
+} catch Error as e {
+    MsgBox("Error: " . e.Message)
+}

@@ -1,0 +1,287 @@
+; Advanced Text Search and File Processing
+; Demonstrates search, indexing, and file content manipulation
+
+class TextSearcher {
+    _text := ""
+    _index := Map()
+
+    __New(text := "") {
+        this._text := text
+        this._BuildIndex()
+    }
+
+    SetText(text) {
+        this._text := text
+        this._BuildIndex()
+        return this
+    }
+
+    _BuildIndex() {
+        this._index := Map()
+        words := StrSplit(StrLower(this._text), A_Space)
+
+        for idx, word in words {
+            word := StrTrim(word, ".,!?;:")
+            if (word != "") {
+                if (!this._index.Has(word))
+                    this._index[word] := []
+                this._index[word].Push(idx)
+            }
+        }
+    }
+
+    Search(query) {
+        lowerQuery := StrLower(query)
+        results := []
+
+        for key, positions in this._index {
+            if (InStr(key, lowerQuery)) {
+                results.Push({
+                    word: key,
+                    positions: positions,
+                    count: positions.Length
+                })
+            }
+        }
+
+        return results
+    }
+
+    SearchExact(word) {
+        word := StrLower(word)
+        return this._index.Has(word) ? this._index[word].Length : 0
+    }
+
+    GetContext(word, contextWords := 2) {
+        word := StrLower(word)
+        if (!this._index.Has(word))
+            return []
+
+        words := StrSplit(this._text, A_Space)
+        positions := this._index[word]
+        contexts := []
+
+        for pos in positions {
+            start := Max(1, pos - contextWords)
+            end := Min(words.Length, pos + contextWords)
+
+            context := ""
+            loop (end - start + 1) {
+                context .= words[start + A_Index - 1] . A_Space
+            }
+
+            contexts.Push(StrTrim(context))
+        }
+
+        return contexts
+    }
+
+    Max(a, b) => a > b ? a : b
+    Min(a, b) => a < b ? a : b
+}
+
+text := "The quick brown fox jumps over the lazy dog. The fox is quick."
+searcher := TextSearcher(text)
+
+results := searcher.Search("quick")
+MsgBox("Found 'quick': " . results.Length . " matches")
+
+count := searcher.SearchExact("fox")
+MsgBox("'fox' appears " . count . " times")
+
+; File search utility
+class FileSearcher {
+    _rootPath := ""
+    _results := []
+
+    SearchInFiles(rootPath, pattern, filePattern := "*.txt") {
+        this._rootPath := rootPath
+        this._results := []
+        this._SearchRecursive(rootPath, pattern, filePattern)
+        return this._results
+    }
+
+    _SearchRecursive(path, pattern, filePattern) {
+        loop Files, path . "\" . filePattern, "F" {
+            try {
+                content := FileRead(A_LoopFileFullPath)
+                pos := 1
+
+                while (pos := RegExMatch(content, pattern, match, pos)) {
+                    this._results.Push({
+                        file: A_LoopFileFullPath,
+                        line: this._GetLineNumber(content, pos),
+                        match: match[0],
+                        position: pos
+                    })
+                    pos += StrLen(match[0]) > 0 ? StrLen(match[0]) : 1
+                }
+            } catch Error as e {
+                OutputDebug("Error reading file: " . e.Message)
+            }
+        }
+
+        ; Search subdirectories
+        loop Files, path . "\*", "D" {
+            this._SearchRecursive(A_LoopFileFullPath, pattern, filePattern)
+        }
+    }
+
+    _GetLineNumber(content, position) {
+        lineNum := 1
+        loop StrLen(SubStr(content, 1, position)) {
+            if (SubStr(content, A_Index, 1) = "`n")
+                lineNum++
+        }
+        return lineNum
+    }
+
+    GetResults() {
+        return this._results
+    }
+}
+
+; Find and replace
+class FindReplace {
+    _text := ""
+
+    SetText(text) {
+        this._text := text
+        return this
+    }
+
+    Find(pattern) {
+        results := []
+        pos := 1
+
+        while (pos := RegExMatch(this._text, pattern, match, pos)) {
+            results.Push({
+                match: match[0],
+                position: pos,
+                length: StrLen(match[0])
+            })
+            pos += StrLen(match[0])
+        }
+
+        return results
+    }
+
+    Replace(pattern, replacement) {
+        return RegExReplace(this._text, pattern, replacement)
+    }
+
+    ReplaceFirst(pattern, replacement) {
+        return RegExReplace(this._text, pattern, replacement, , 1)
+    }
+
+    ReplaceCount(pattern, replacement, count) {
+        return RegExReplace(this._text, pattern, replacement, , count)
+    }
+
+    GetText() {
+        return this._text
+    }
+}
+
+fr := FindReplace()
+fr.SetText("The cat and the dog")
+fr.Replace("the", "a")
+MsgBox(fr.GetText())
+
+; Line processor
+class LineProcessor {
+    _lines := []
+
+    SetText(text) {
+        this._lines := StrSplit(text, "`n")
+        return this
+    }
+
+    GetLine(lineNum) {
+        if (lineNum > 0 && lineNum <= this._lines.Length)
+            return this._lines[lineNum]
+        return ""
+    }
+
+    FilterLines(predicate) {
+        result := []
+        for line in this._lines {
+            if (predicate(line))
+                result.Push(line)
+        }
+        return result
+    }
+
+    MapLines(transformer) {
+        result := []
+        for line in this._lines {
+            result.Push(transformer(line))
+        }
+        return result
+    }
+
+    GetLineCount() {
+        return this._lines.Length
+    }
+
+    InsertLine(lineNum, content) {
+        this._lines.InsertAt(lineNum, content)
+        return this
+    }
+
+    RemoveLine(lineNum) {
+        this._lines.RemoveAt(lineNum)
+        return this
+    }
+
+    ToString() {
+        return StrJoin("`n", this._lines)
+    }
+
+    StrJoin(sep, arr) {
+        result := ""
+        for item in arr
+            result .= (result ? sep : "") . item
+        return result
+    }
+}
+
+lp := LineProcessor()
+lp.SetText("Line 1`nLine 2`nLine 3")
+
+MsgBox("Total lines: " . lp.GetLineCount())
+MsgBox("Second line: " . lp.GetLine(2))
+
+; Diff viewer
+class Diff {
+    static Compare(text1, text2) {
+        lines1 := StrSplit(text1, "`n")
+        lines2 := StrSplit(text2, "`n")
+
+        diffs := []
+
+        maxLen := Max(lines1.Length, lines2.Length)
+
+        loop maxLen {
+            line1 := A_Index <= lines1.Length ? lines1[A_Index] : ""
+            line2 := A_Index <= lines2.Length ? lines2[A_Index] : ""
+
+            if (line1 = line2) {
+                diffs.Push({type: "same", content: line1})
+            } else if (line1 = "") {
+                diffs.Push({type: "added", content: line2})
+            } else if (line2 = "") {
+                diffs.Push({type: "removed", content: line1})
+            } else {
+                diffs.Push({type: "modified", old: line1, new: line2})
+            }
+        }
+
+        return diffs
+    }
+
+    static Max(a, b) => a > b ? a : b
+}
+
+diff := Diff.Compare("Hello`nWorld", "Hello`nWorld2")
+MsgBox("Differences: " . diff.Length)

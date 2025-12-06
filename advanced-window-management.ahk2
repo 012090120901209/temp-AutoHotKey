@@ -1,0 +1,260 @@
+; Advanced Window Management and Process Control
+; Demonstrates window tracking, manipulation, and process management
+
+class WindowManager {
+    _windows := Map()
+    _activeWindow := ""
+
+    RegisterWindow(id, title) {
+        this._windows[id] := {title: title, active: false, position: {x: 0, y: 0}}
+        return this
+    }
+
+    FindWindow(title) {
+        hwnd := WinExist(title)
+        return hwnd
+    }
+
+    ActivateWindow(id) {
+        if (this._windows.Has(id)) {
+            WinActivate(this._windows[id].title)
+            this._activeWindow := id
+            this._windows[id].active := true
+        }
+        return this
+    }
+
+    GetWindowInfo(id) {
+        return this._windows.Has(id) ? this._windows[id] : ""
+    }
+
+    SaveWindowPosition(id) {
+        title := this._windows.Has(id) ? this._windows[id].title : ""
+        if (title) {
+            WinGetPos(&x, &y, &w, &h, title)
+            if (this._windows.Has(id)) {
+                this._windows[id].position := {x, y, w, h}
+            }
+        }
+        return this
+    }
+
+    RestoreWindowPosition(id) {
+        if (this._windows.Has(id)) {
+            pos := this._windows[id].position
+            title := this._windows[id].title
+            WinMove(pos.x, pos.y, pos.w, pos.h, title)
+        }
+        return this
+    }
+
+    CloseWindow(id) {
+        if (this._windows.Has(id)) {
+            WinClose(this._windows[id].title)
+        }
+        return this
+    }
+}
+
+winMgr := WindowManager()
+winMgr.RegisterWindow("notepad", "Untitled - Notepad")
+
+; Process manager
+class ProcessManager {
+    _processes := Map()
+
+    Launch(name, path, args := "") {
+        try {
+            Run(path . " " . args)
+            this._processes[name] := {path, args, running: true, pidMap: Map()}
+            return true
+        } catch Error as e {
+            OutputDebug("Failed to launch: " . e.Message)
+            return false
+        }
+    }
+
+    Terminate(name) {
+        if (this._processes.Has(name)) {
+            ProcessClose(name)
+            this._processes[name].running := false
+        }
+        return this
+    }
+
+    IsRunning(name) {
+        return ProcessExist(name) ? true : false
+    }
+
+    WaitForProcess(name, timeout := 5000) {
+        startTime := A_TickCount
+
+        loop {
+            if (this.IsRunning(name))
+                return true
+
+            if (A_TickCount - startTime > timeout)
+                return false
+
+            Sleep(100)
+        }
+    }
+
+    GetProcessInfo(name) {
+        return this._processes.Has(name) ? this._processes[name] : ""
+    }
+}
+
+procMgr := ProcessManager()
+
+; Window snapping and tiling
+class WindowTiler {
+    _screenWidth := A_ScreenWidth
+    _screenHeight := A_ScreenHeight
+
+    TileLeft(title) {
+        WinMove(0, 0, this._screenWidth // 2, this._screenHeight, title)
+        return this
+    }
+
+    TileRight(title) {
+        WinMove(this._screenWidth // 2, 0, this._screenWidth // 2, this._screenHeight, title)
+        return this
+    }
+
+    TileTop(title) {
+        WinMove(0, 0, this._screenWidth, this._screenHeight // 2, title)
+        return this
+    }
+
+    TileBottom(title) {
+        WinMove(0, this._screenHeight // 2, this._screenWidth, this._screenHeight // 2, title)
+        return this
+    }
+
+    TileQuadrant(title, quadrant) {
+        w := this._screenWidth // 2
+        h := this._screenHeight // 2
+
+        switch quadrant {
+            case 1: WinMove(0, 0, w, h, title)
+            case 2: WinMove(w, 0, w, h, title)
+            case 3: WinMove(0, h, w, h, title)
+            case 4: WinMove(w, h, w, h, title)
+        }
+
+        return this
+    }
+
+    Maximize(title) {
+        WinMaximize(title)
+        return this
+    }
+
+    Minimize(title) {
+        WinMinimize(title)
+        return this
+    }
+
+    Center(title) {
+        WinGetPos(&x, &y, &w, &h, title)
+        newX := (this._screenWidth - w) // 2
+        newY := (this._screenHeight - h) // 2
+        WinMove(newX, newY, , , title)
+        return this
+    }
+}
+
+tiler := WindowTiler()
+
+; Window monitor
+class WindowMonitor {
+    _previousWindows := []
+    _currentWindows := []
+    _onWindowAdded := ""
+    _onWindowRemoved := ""
+
+    RefreshWindows() {
+        this._previousWindows := this._currentWindows.Clone()
+        this._currentWindows := WinGetList()
+        this._DetectChanges()
+    }
+
+    _DetectChanges() {
+        for win in this._currentWindows {
+            if (!this._windowInArray(win, this._previousWindows)) {
+                if (this._onWindowAdded)
+                    this._onWindowAdded(win)
+            }
+        }
+
+        for win in this._previousWindows {
+            if (!this._windowInArray(win, this._currentWindows)) {
+                if (this._onWindowRemoved)
+                    this._onWindowRemoved(win)
+            }
+        }
+    }
+
+    OnWindowAdded(handler) {
+        this._onWindowAdded := handler
+        return this
+    }
+
+    OnWindowRemoved(handler) {
+        this._onWindowRemoved := handler
+        return this
+    }
+
+    _windowInArray(win, arr) {
+        for w in arr {
+            if (w = win)
+                return true
+        }
+        return false
+    }
+
+    GetOpenWindows() {
+        return this._currentWindows
+    }
+}
+
+monitor := WindowMonitor()
+monitor.OnWindowAdded((win) => OutputDebug("Window opened"))
+monitor.OnWindowRemoved((win) => OutputDebug("Window closed"))
+
+; Desktop switcher
+class DesktopManager {
+    _desktops := Map()
+    _currentDesktop := 1
+
+    AddDesktop(name) {
+        this._desktops[name] := {
+            windows: [],
+            active: false
+        }
+        return this
+    }
+
+    SwitchDesktop(name) {
+        this._currentDesktop := name
+        this._desktops[name].active := true
+        return this
+    }
+
+    GetCurrentDesktop() {
+        return this._currentDesktop
+    }
+
+    SaveDesktopState(name) {
+        if (this._desktops.Has(name)) {
+            this._desktops[name].windows := WinGetList()
+        }
+        return this
+    }
+}
+
+desktop := DesktopManager()
+desktop.AddDesktop("Work")
+desktop.AddDesktop("Gaming")
+desktop.SwitchDesktop("Work")

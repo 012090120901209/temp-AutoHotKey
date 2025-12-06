@@ -1,0 +1,269 @@
+; Advanced GUI Control Handling and Validation
+; Demonstrates control event handlers, validation, and state management
+
+class ControlManager {
+    _controls := Map()
+    _validators := Map()
+    _stateChangedHandlers := []
+
+    RegisterControl(name, type) {
+        this._controls[name] := {type: type, value: "", visible: true, enabled: true}
+        return this
+    }
+
+    SetValue(name, value) {
+        if (this._controls.Has(name)) {
+            oldValue := this._controls[name].value
+            this._controls[name].value := value
+
+            ; Trigger validation
+            if (this._validators.Has(name)) {
+                valid := this._validators[name](value)
+                if (!valid) {
+                    this._controls[name].value := oldValue
+                    return false
+                }
+            }
+
+            ; Notify state change
+            for handler in this._stateChangedHandlers {
+                handler(name, value)
+            }
+
+            return true
+        }
+        return false
+    }
+
+    GetValue(name) {
+        return this._controls.Has(name) ? this._controls[name].value : ""
+    }
+
+    AddValidator(name, validatorFn) {
+        this._validators[name] := validatorFn
+        return this
+    }
+
+    OnStateChanged(handler) {
+        this._stateChangedHandlers.Push(handler)
+        return this
+    }
+
+    Show(name) {
+        if (this._controls.Has(name))
+            this._controls[name].visible := true
+        return this
+    }
+
+    Hide(name) {
+        if (this._controls.Has(name))
+            this._controls[name].visible := false
+        return this
+    }
+
+    Enable(name) {
+        if (this._controls.Has(name))
+            this._controls[name].enabled := true
+        return this
+    }
+
+    Disable(name) {
+        if (this._controls.Has(name))
+            this._controls[name].enabled := false
+        return this
+    }
+}
+
+manager := ControlManager()
+
+manager.RegisterControl("email", "textinput")
+    .AddValidator("email", (value) => InStr(value, "@") != 0)
+    .OnStateChanged((name, value) => OutputDebug(name . " = " . value))
+
+manager.SetValue("email", "valid@example.com")  ; Success
+manager.SetValue("email", "invalid-email")      ; Fails validation
+
+; Dropdown with dynamic options
+class Dropdown {
+    _options := []
+    _selectedIndex := 1
+    _onChange := ""
+
+    __New(options := []) {
+        this._options := options
+    }
+
+    AddOption(label, value := "") {
+        this._options.Push({label, value: (value = "" ? label : value)})
+        return this
+    }
+
+    SetOptions(options) {
+        this._options := options
+        return this
+    }
+
+    GetOptions() {
+        return this._options
+    }
+
+    Select(index) {
+        if (index > 0 && index <= this._options.Length) {
+            this._selectedIndex := index
+            if (this._onChange) {
+                this._onChange(this.GetSelectedValue())
+            }
+        }
+        return this
+    }
+
+    GetSelectedValue() {
+        if (this._selectedIndex > 0 && this._selectedIndex <= this._options.Length) {
+            return this._options[this._selectedIndex].value
+        }
+        return ""
+    }
+
+    OnChange(handler) {
+        this._onChange := handler
+        return this
+    }
+}
+
+dropdown := Dropdown()
+    .AddOption("Option 1", "opt1")
+    .AddOption("Option 2", "opt2")
+    .AddOption("Option 3", "opt3")
+    .OnChange((value) => MsgBox("Selected: " . value))
+
+dropdown.Select(2)  ; Triggers change
+
+; Checkbox group
+class CheckboxGroup {
+    _items := []
+    _selected := []
+
+    AddItem(label, value := "") {
+        this._items.Push({label, value: (value = "" ? label : value), checked: false})
+        return this
+    }
+
+    Toggle(index) {
+        if (index > 0 && index <= this._items.Length) {
+            this._items[index].checked := !this._items[index].checked
+            this._UpdateSelected()
+        }
+        return this
+    }
+
+    GetSelected() {
+        return this._selected.Clone()
+    }
+
+    _UpdateSelected() {
+        this._selected := []
+        for item in this._items {
+            if (item.checked)
+                this._selected.Push(item.value)
+        }
+    }
+}
+
+checkboxGroup := CheckboxGroup()
+    .AddItem("Item 1", "item1")
+    .AddItem("Item 2", "item2")
+    .AddItem("Item 3", "item3")
+
+checkboxGroup.Toggle(1)  ; Check first
+checkboxGroup.Toggle(3)  ; Check third
+MsgBox("Selected: " . StrJoin(",", checkboxGroup.GetSelected()))
+
+StrJoin(sep, arr) {
+    result := ""
+    for item in arr
+        result .= (result ? sep : "") . item
+    return result
+}
+
+; Radio button group
+class RadioGroup {
+    _items := []
+    _selectedIndex := 0
+
+    AddItem(label, value := "") {
+        this._items.Push({label, value: (value = "" ? label : value)})
+        return this
+    }
+
+    Select(index) {
+        if (index > 0 && index <= this._items.Length) {
+            this._selectedIndex := index
+        }
+        return this
+    }
+
+    GetSelected() {
+        if (this._selectedIndex > 0) {
+            return this._items[this._selectedIndex].value
+        }
+        return ""
+    }
+}
+
+radioGroup := RadioGroup()
+    .AddItem("Red", "red")
+    .AddItem("Green", "green")
+    .AddItem("Blue", "blue")
+
+radioGroup.Select(2)
+MsgBox("Selected color: " . radioGroup.GetSelected())
+
+; Form validation
+class FormValidator {
+    _rules := Map()
+    _errors := []
+
+    AddRule(field, rule) {
+        if (!this._rules.Has(field))
+            this._rules[field] := []
+        this._rules[field].Push(rule)
+        return this
+    }
+
+    Validate(data) {
+        this._errors := []
+
+        for field, rules in this._rules {
+            value := data.Has(field) ? data[field] : ""
+
+            for rule in rules {
+                if (!rule.validate(value)) {
+                    this._errors.Push(field . ": " . rule.message)
+                }
+            }
+        }
+
+        return this._errors.Length = 0
+    }
+
+    GetErrors() {
+        return this._errors
+    }
+}
+
+validator := FormValidator()
+    .AddRule("email", {
+        validate: (v) => InStr(v, "@") != 0,
+        message: "Invalid email"
+    })
+    .AddRule("age", {
+        validate: (v) => IsNumber(v) && v >= 18,
+        message: "Must be 18 or older"
+    })
+
+formData := Map("email", "test@example.com", "age", "25")
+if (validator.Validate(formData)) {
+    MsgBox("Form is valid!")
+} else {
+    MsgBox(StrJoin("`n", validator.GetErrors()))
+}

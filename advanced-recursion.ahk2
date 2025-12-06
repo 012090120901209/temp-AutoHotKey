@@ -1,0 +1,335 @@
+; Advanced Recursion and Recursive Algorithms
+; Demonstrates recursive patterns, optimization, and complex recursive solutions
+
+; Basic recursive functions with memoization
+Fibonacci(n, memo := Map()) {
+    if (memo.Has(n))
+        return memo[n]
+
+    if (n <= 1)
+        return n
+
+    result := Fibonacci(n - 1, memo) + Fibonacci(n - 2, memo)
+    memo[n] := result
+
+    return result
+}
+
+; Factorial with tail call optimization
+Factorial(n, accumulator := 1) {
+    if (n <= 1)
+        return accumulator
+    return Factorial(n - 1, n * accumulator)
+}
+
+MsgBox("Fibonacci(10): " . Fibonacci(10))
+MsgBox("Factorial(5): " . Factorial(5))
+
+; Tree traversal
+class TreeNode {
+    value := ""
+    children := []
+
+    __New(value) {
+        this.value := value
+        this.children := []
+    }
+
+    AddChild(node) {
+        this.children.Push(node)
+        return this
+    }
+}
+
+class TreeTraversal {
+    static InOrder(node, callback := "") {
+        if (!node)
+            return
+
+        for child in node.children {
+            this.InOrder(child, callback)
+        }
+
+        if (callback)
+            callback(node.value)
+    }
+
+    static PreOrder(node, callback := "") {
+        if (!node)
+            return
+
+        if (callback)
+            callback(node.value)
+
+        for child in node.children {
+            this.PreOrder(child, callback)
+        }
+    }
+
+    static PostOrder(node, callback := "") {
+        if (!node)
+            return
+
+        for child in node.children {
+            this.PostOrder(child, callback)
+        }
+
+        if (callback)
+            callback(node.value)
+    }
+
+    static BFS(root, callback := "") {
+        queue := []
+        queue.Push(root)
+
+        while (queue.Length > 0) {
+            node := queue.RemoveAt(1)
+
+            if (callback)
+                callback(node.value)
+
+            for child in node.children {
+                queue.Push(child)
+            }
+        }
+    }
+
+    static DFS(root, callback := "") {
+        stack := []
+        stack.Push(root)
+
+        while (stack.Length > 0) {
+            node := stack.Pop()
+
+            if (callback)
+                callback(node.value)
+
+            for child in node.children {
+                stack.Push(child)
+            }
+        }
+    }
+
+    static Height(node) {
+        if (!node || node.children.Length = 0)
+            return 0
+
+        maxHeight := 0
+        for child in node.children {
+            height := this.Height(child)
+            if (height > maxHeight)
+                maxHeight := height
+        }
+
+        return maxHeight + 1
+    }
+
+    static Size(node) {
+        if (!node)
+            return 0
+
+        size := 1
+        for child in node.children {
+            size += this.Size(child)
+        }
+
+        return size
+    }
+}
+
+; Create a tree
+root := TreeNode("Root")
+child1 := TreeNode("Child 1")
+child2 := TreeNode("Child 2")
+grandchild := TreeNode("Grandchild")
+
+root.AddChild(child1)
+root.AddChild(child2)
+child1.AddChild(grandchild)
+
+; Traverse tree
+OutputDebug("Pre-order traversal:")
+TreeTraversal.PreOrder(root, (val) => OutputDebug(val))
+
+; Graph algorithms
+class Graph {
+    _nodes := Map()
+    _edges := Map()
+
+    AddNode(id, data := "") {
+        this._nodes[id] := {data, visited: false}
+        if (!this._edges.Has(id))
+            this._edges[id] := []
+        return this
+    }
+
+    AddEdge(fromId, toId, weight := 1) {
+        if (!this._edges.Has(fromId))
+            this._edges[fromId] := []
+        this._edges[fromId].Push({toId, weight})
+        return this
+    }
+
+    DFS(startId, callback := "") {
+        this._ResetVisited()
+        this._DFSHelper(startId, callback)
+    }
+
+    _DFSHelper(nodeId, callback) {
+        this._nodes[nodeId].visited := true
+
+        if (callback)
+            callback(nodeId)
+
+        for edge in this._edges[nodeId] {
+            if (!this._nodes[edge.toId].visited) {
+                this._DFSHelper(edge.toId, callback)
+            }
+        }
+    }
+
+    BFS(startId, callback := "") {
+        this._ResetVisited()
+        queue := []
+        queue.Push(startId)
+        this._nodes[startId].visited := true
+
+        while (queue.Length > 0) {
+            nodeId := queue.RemoveAt(1)
+
+            if (callback)
+                callback(nodeId)
+
+            for edge in this._edges[nodeId] {
+                if (!this._nodes[edge.toId].visited) {
+                    this._nodes[edge.toId].visited := true
+                    queue.Push(edge.toId)
+                }
+            }
+        }
+    }
+
+    _ResetVisited() {
+        for id, node in this._nodes {
+            node.visited := false
+        }
+    }
+}
+
+; Quicksort with recursion
+QuickSort(arr, low := 1, high := "") {
+    if (high = "")
+        high := arr.Length
+
+    if (low < high) {
+        pi := Partition(arr, low, high)
+        QuickSort(arr, low, pi - 1)
+        QuickSort(arr, pi + 1, high)
+    }
+
+    return arr
+}
+
+Partition(arr, low, high) {
+    pivot := arr[high]
+    i := low - 1
+
+    loop (high - low) {
+        if (arr[low + A_Index - 1] < pivot) {
+            i++
+            temp := arr[i]
+            arr[i] := arr[low + A_Index - 1]
+            arr[low + A_Index - 1] := temp
+        }
+    }
+
+    temp := arr[i + 1]
+    arr[i + 1] := arr[high]
+    arr[high] := temp
+
+    return i + 1
+}
+
+numbers := [64, 34, 25, 12, 22, 11, 90]
+sorted := QuickSort(numbers)
+MsgBox("Sorted: " . sorted[1] . ", " . sorted[2])
+
+; Permutations generator
+class Permutations {
+    static Generate(items) {
+        result := []
+        this._GenerateHelper(items, [], result)
+        return result
+    }
+
+    static _GenerateHelper(items, current, result) {
+        if (items.Length = 0) {
+            result.Push(current.Clone())
+            return
+        }
+
+        loop items.Length {
+            item := items[A_Index]
+            newItems := items.Clone()
+            newItems.RemoveAt(A_Index)
+
+            newCurrent := current.Clone()
+            newCurrent.Push(item)
+
+            this._GenerateHelper(newItems, newCurrent, result)
+        }
+    }
+}
+
+perms := Permutations.Generate([1, 2, 3])
+MsgBox("Generated " . perms.Length . " permutations")
+
+; Backtracking - N-Queens problem
+class NQueens {
+    static Solve(n) {
+        solutions := []
+        board := []
+
+        loop n {
+            board[A_Index] := []
+            loop n {
+                board[A_Index][A_Index] := 0
+            }
+        }
+
+        this._SolveHelper(board, 0, n, solutions)
+        return solutions
+    }
+
+    static _SolveHelper(board, row, n, solutions) {
+        if (row = n) {
+            solutions.Push(board)
+            return
+        }
+
+        loop n {
+            col := A_Index
+            if (this._IsSafe(board, row, col, n)) {
+                board[row + 1][col] := 1
+                this._SolveHelper(board, row + 1, n, solutions)
+                board[row + 1][col] := 0
+            }
+        }
+    }
+
+    static _IsSafe(board, row, col, n) {
+        ; Check row
+        loop n {
+            if (board[row + 1][A_Index] = 1)
+                return false
+        }
+
+        ; Check column
+        loop n {
+            if (board[A_Index][col] = 1)
+                return false
+        }
+
+        return true
+    }
+}

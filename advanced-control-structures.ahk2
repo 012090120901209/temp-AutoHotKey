@@ -1,0 +1,302 @@
+; Advanced Control Flow and Conditional Logic
+; Demonstrates pattern matching, state machines, and complex control structures
+
+class StateMachine {
+    _state := ""
+    _states := Map()
+    _transitions := Map()
+    _onStateChange := ""
+
+    __New(initialState) {
+        this._state := initialState
+    }
+
+    DefineState(name, onEnter := "", onExit := "") {
+        this._states[name] := {onEnter, onExit}
+        return this
+    }
+
+    DefineTransition(fromState, toState, condition := "", action := "") {
+        key := fromState . "->" . toState
+        this._transitions[key] := {condition, action}
+        return this
+    }
+
+    OnStateChange(handler) {
+        this._onStateChange := handler
+        return this
+    }
+
+    Transition(toState) {
+        fromState := this._state
+        key := fromState . "->" . toState
+
+        if (this._transitions.Has(key)) {
+            transition := this._transitions[key]
+
+            if (transition.condition != "" && !transition.condition()) {
+                return false
+            }
+
+            if (this._states.Has(fromState) && this._states[fromState].onExit != "") {
+                this._states[fromState].onExit()
+            }
+
+            this._state := toState
+
+            if (this._states.Has(toState) && this._states[toState].onEnter != "") {
+                this._states[toState].onEnter()
+            }
+
+            if (this._onStateChange)
+                this._onStateChange(fromState, toState)
+
+            return true
+        }
+
+        return false
+    }
+
+    GetState() {
+        return this._state
+    }
+
+    IsState(state) {
+        return this._state = state
+    }
+}
+
+; Create a traffic light state machine
+trafficLight := StateMachine("Red")
+trafficLight.DefineState("Red", () => OutputDebug("🔴 Red Light"))
+trafficLight.DefineState("Yellow", () => OutputDebug("🟡 Yellow Light"))
+trafficLight.DefineState("Green", () => OutputDebug("🟢 Green Light"))
+
+trafficLight.DefineTransition("Red", "Green")
+trafficLight.DefineTransition("Green", "Yellow")
+trafficLight.DefineTransition("Yellow", "Red")
+
+trafficLight.OnStateChange((from, to) => OutputDebug("Transition: " . from . " -> " . to))
+
+trafficLight.Transition("Green")
+trafficLight.Transition("Yellow")
+trafficLight.Transition("Red")
+
+; Pattern matching simulator
+class PatternMatcher {
+    _patterns := []
+
+    Add(pattern, handler) {
+        this._patterns.Push({pattern, handler})
+        return this
+    }
+
+    Match(value) {
+        for patternObj in this._patterns {
+            if (this._TestPattern(patternObj.pattern, value)) {
+                return patternObj.handler(value)
+            }
+        }
+        return ""
+    }
+
+    _TestPattern(pattern, value) {
+        if (Type(pattern) = "String") {
+            return value = pattern
+        } else if (Type(pattern) = "Func") {
+            return pattern(value)
+        }
+        return false
+    }
+}
+
+matcher := PatternMatcher()
+matcher.Add(0, (n) => "Zero")
+matcher.Add((n) => n < 0, (n) => "Negative")
+matcher.Add((n) => n > 0 && Mod(n, 2) = 0, (n) => "Even positive")
+matcher.Add((n) => n > 0 && Mod(n, 2) = 1, (n) => "Odd positive")
+
+MsgBox(matcher.Match(0))
+MsgBox(matcher.Match(-5))
+MsgBox(matcher.Match(4))
+MsgBox(matcher.Match(7))
+
+; Ternary operator simulations
+class Conditional {
+    static If(condition, trueValue, falseValue := "") {
+        return condition ? trueValue : falseValue
+    }
+
+    static Switch(value, cases, defaultValue := "") {
+        for key, val in cases {
+            if (value = key)
+                return val
+        }
+        return defaultValue
+    }
+
+    static Coalesce(args*) {
+        for arg in args {
+            if (arg != "" && arg != unset)
+                return arg
+        }
+        return ""
+    }
+}
+
+result := Conditional.If(5 > 3, "Greater", "Less")
+MsgBox(result)
+
+; Loop abstractions
+class Loops {
+    static For(start, end, step := 1, fn) {
+        if (step > 0) {
+            i := start
+            while (i <= end) {
+                fn(i)
+                i += step
+            }
+        } else if (step < 0) {
+            i := start
+            while (i >= end) {
+                fn(i)
+                i += step
+            }
+        }
+    }
+
+    static ForEach(collection, fn) {
+        for item in collection {
+            fn(item)
+        }
+    }
+
+    static ForEachWithIndex(collection, fn) {
+        index := 1
+        for item in collection {
+            fn(item, index)
+            index++
+        }
+    }
+
+    static While(condition, fn) {
+        while (condition()) {
+            fn()
+        }
+    }
+
+    static Until(condition, fn) {
+        loop {
+            fn()
+            if (condition())
+                break
+        }
+    }
+
+    static Repeat(count, fn) {
+        loop count {
+            fn(A_Index)
+        }
+    }
+}
+
+; Use loop abstractions
+Loops.For(1, 5, 1, (i) => OutputDebug("Iteration: " . i))
+
+nums := [1, 2, 3, 4, 5]
+Loops.ForEach(nums, (n) => OutputDebug("Number: " . n))
+
+; Guard clauses
+class Guards {
+    static CheckRange(value, min, max) {
+        if (value < min || value > max)
+            throw Error("Value out of range")
+        return value
+    }
+
+    static CheckNotNull(value) {
+        if (value = "" || value = unset)
+            throw Error("Value is null")
+        return value
+    }
+
+    static CheckType(value, type) {
+        if (Type(value) != type)
+            throw Error("Invalid type. Expected: " . type . ", Got: " . Type(value))
+        return value
+    }
+}
+
+try {
+    Guards.CheckRange(10, 0, 5)
+} catch Error as e {
+    MsgBox("Guard failed: " . e.Message)
+}
+
+; Switch expression simulator
+case(condition, result, cases*) {
+    if (condition)
+        return result
+    for caseArg in cases {
+        if (Type(caseArg) = "Array" && caseArg.Length = 2) {
+            if (caseArg[1])
+                return caseArg[2]
+        }
+    }
+    return ""
+}
+
+; Early return pattern
+EarlyReturn(value) {
+    if (value < 0)
+        return "Negative"
+
+    if (value = 0)
+        return "Zero"
+
+    if (value > 100)
+        return "Very Large"
+
+    return "In Range"
+}
+
+MsgBox(EarlyReturn(50))
+MsgBox(EarlyReturn(-5))
+MsgBox(EarlyReturn(200))
+
+; Iterator pattern
+class Iterator {
+    _items := []
+    _index := 1
+
+    __New(items) {
+        this._items := items
+    }
+
+    Next() {
+        if (this._index <= this._items.Length) {
+            value := this._items[this._index]
+            this._index++
+            return {value, done: false}
+        }
+        return {value: "", done: true}
+    }
+
+    Reset() {
+        this._index := 1
+        return this
+    }
+
+    HasNext() {
+        return this._index <= this._items.Length
+    }
+}
+
+iterator := Iterator([10, 20, 30, 40, 50])
+
+loop {
+    result := iterator.Next()
+    if (result.done)
+        break
+    OutputDebug("Item: " . result.value)
+}

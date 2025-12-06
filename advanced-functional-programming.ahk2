@@ -1,0 +1,136 @@
+; Advanced Functional Programming Techniques
+; Demonstrates currying, partial application, composition, and memoization
+
+; Function currying - breaking multi-arg functions into single-arg chains
+Curry(fn, arity := unset) {
+    if (arity = unset)
+        arity := fn.Length
+
+    if (arity <= 1)
+        return fn
+
+    return (arg1) => (
+        arity = 1 ? fn(arg1) :
+        Curry((args*) => fn(arg1, args*), arity - 1)
+    )
+}
+
+Add3(a, b, c) {
+    return a + b + c
+}
+
+curriedAdd := Curry(Add3)
+add5 := curriedAdd(5)
+add5and3 := add5(3)
+result := add5and3(2)
+MsgBox(result)  ; 10
+
+; Partial application - fixing some arguments
+Partial(fn, fixedArgs*) {
+    return (args*) => fn(fixedArgs*, args*)
+}
+
+Multiply(a, b) {
+    return a * b
+}
+
+double := Partial(Multiply, 2)
+triple := Partial(Multiply, 3)
+
+MsgBox(double(5))  ; 10
+MsgBox(triple(5))  ; 15
+
+; Function composition - combining multiple functions
+Compose(f, g) {
+    return (x) => f(g(x))
+}
+
+Square(n) => n * n
+AddOne(n) => n + 1
+
+addOneThenSquare := Compose(Square, AddOne)
+squareThenAddOne := Compose(AddOne, Square)
+
+MsgBox(addOneThenSquare(3))  ; (3+1)^2 = 16
+MsgBox(squareThenAddOne(3))  ; 3^2+1 = 10
+
+; Pipeline - left-to-right function application
+Pipeline(value, fns*) {
+    result := value
+    for fn in fns {
+        result := fn(result)
+    }
+    return result
+}
+
+cleaned := Pipeline("  hello world  ",
+    (s) => StrTrim(s),
+    (s) => StrUpper(s),
+    (s) => StrReplace(s, " ", "_")
+)
+
+MsgBox(cleaned)  ; HELLO_WORLD
+
+; Memoization - caching function results
+Memoize(fn) {
+    cache := Map()
+    callCount := 0
+
+    return (args*) => (
+        key := ""
+        for arg in args
+            key .= String(arg) . ","
+
+        if (cache.Has(key)) {
+            return cache[key]
+        }
+
+        result := fn(args*)
+        cache[key] := result
+        callCount++
+        return result
+    )
+}
+
+Fibonacci(n) {
+    return n <= 1 ? n : Fibonacci(n - 1) + Fibonacci(n - 2)
+}
+
+memoFib := Memoize(Fibonacci)
+MsgBox(memoFib(10))  ; Much faster than raw Fibonacci
+
+; Higher-order functions
+Map(arr, fn) {
+    result := []
+    for item in arr
+        result.Push(fn(item))
+    return result
+}
+
+Filter(arr, predicate) {
+    result := []
+    for item in arr {
+        if (predicate(item))
+            result.Push(item)
+    }
+    return result
+}
+
+Reduce(arr, fn, initial := unset) {
+    result := initial = unset ? arr[1] : initial
+    startIdx := initial = unset ? 2 : 1
+
+    loop (arr.Length - (initial = unset && arr.Length > 0 ? 1 : 0)) {
+        result := fn(result, arr[startIdx])
+        startIdx++
+    }
+
+    return result
+}
+
+numbers := [1, 2, 3, 4, 5]
+doubled := Map(numbers, (n) => n * 2)
+evens := Filter(numbers, (n) => Mod(n, 2) = 0)
+sum := Reduce(numbers, (a, b) => a + b, 0)
+
+MsgBox("Doubled: " . doubled[1] . ", Evens: " . evens.Length . ", Sum: " . sum)

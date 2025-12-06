@@ -1,0 +1,141 @@
+; Advanced Error Handling and Exception Management
+; Demonstrates try-catch patterns, error recovery, and error handling middleware
+
+; Basic error handling with recovery
+SafeExecute(fn, errorHandler := unset) {
+    try {
+        return fn()
+    } catch Error as e {
+        if (errorHandler != unset) {
+            return errorHandler(e)
+        }
+        throw e
+    }
+}
+
+result := SafeExecute(
+    () => 10 / 2,
+    (err) => "Error: " . err.Message
+)
+MsgBox(result)  ; 5
+
+; Error with context
+result := SafeExecute(
+    () => 10 / 0,
+    (err) => "Caught: " . err.Message . " at line " . err.Line
+)
+MsgBox(result)
+
+; Retry pattern with exponential backoff
+RetryWithBackoff(fn, maxRetries := 3, baseDelay := 100) {
+    attempt := 0
+
+    loop maxRetries {
+        attempt++
+        try {
+            return fn()
+        } catch Error as e {
+            if (attempt = maxRetries) {
+                throw e
+            }
+            delay := baseDelay * (2 ** (attempt - 1))
+            Sleep(delay)
+        }
+    }
+}
+
+attemptCount := 0
+result := RetryWithBackoff(
+    () => (
+        attemptCount++,
+        attemptCount < 2 ? (throw Error("Simulated failure")) : "Success on attempt " . attemptCount
+    ),
+    3,
+    50
+)
+MsgBox(result)
+
+; Custom exception class
+class ValidationError extends Error {
+    Field := ""
+    Value := ""
+
+    __New(message, field, value) {
+        super.__New(message)
+        this.Field := field
+        this.Value := value
+    }
+}
+
+; Validation with custom errors
+ValidateEmail(email) {
+    if (!email)
+        throw ValidationError("Email required", "email", "")
+
+    if (!InStr(email, "@"))
+        throw ValidationError("Invalid email format", "email", email)
+
+    return true
+}
+
+try {
+    ValidateEmail("invalid-email")
+} catch ValidationError as e {
+    MsgBox("Validation Error: " . e.Message . " [" . e.Field . "=" . e.Value . "]")
+}
+
+; Error recovery with fallback chain
+ExecuteWithFallback(fnList*) {
+    for fn in fnList {
+        try {
+            return fn()
+        } catch Error as e {
+            continue
+        }
+    }
+    throw Error("All fallbacks exhausted")
+}
+
+result := ExecuteWithFallback(
+    () => (throw Error("First failed")),
+    () => (throw Error("Second failed")),
+    () => "Third succeeded"
+)
+MsgBox(result)  ; Third succeeded
+
+; Resource cleanup with finally
+ExecuteWithCleanup(fn, cleanupFn) {
+    try {
+        return fn()
+    } finally {
+        cleanupFn()
+    }
+}
+
+ExecuteWithCleanup(
+    () => MsgBox("Executing"),
+    () => MsgBox("Cleanup")
+)
+
+; Error logging middleware
+CreateErrorLogger(fn, logFn) {
+    return () => {
+        try {
+            return fn()
+        } catch Error as e {
+            logFn(e)
+            throw e
+        }
+    }
+}
+
+loggedFn := CreateErrorLogger(
+    () => (throw Error("Something went wrong")),
+    (err) => OutputDebug("Logged error: " . err.Message)
+)
+
+try {
+    loggedFn()
+} catch Error as e {
+    MsgBox("Error was logged and re-thrown")
+}

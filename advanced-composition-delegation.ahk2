@@ -1,0 +1,184 @@
+; Advanced Composition and Delegation Patterns
+; Demonstrates object composition, delegation, and dependency injection
+
+; Strategy Pattern
+class SortStrategy {
+    Sort(arr) {
+        throw Error("Must implement Sort()")
+    }
+}
+
+class BubbleSort extends SortStrategy {
+    Sort(arr) {
+        result := arr.Clone()
+        loop (result.Length - 1) {
+            loop (result.Length - A_Index) {
+                if (result[A_Index] > result[A_Index + 1]) {
+                    temp := result[A_Index]
+                    result[A_Index] := result[A_Index + 1]
+                    result[A_Index + 1] := temp
+                }
+            }
+        }
+        return result
+    }
+}
+
+class QuickSort extends SortStrategy {
+    Sort(arr) {
+        if (arr.Length <= 1)
+            return arr
+
+        pivot := arr[1]
+        left := [], right := []
+
+        loop (arr.Length - 1) {
+            if (arr[A_Index + 1] < pivot)
+                left.Push(arr[A_Index + 1])
+            else
+                right.Push(arr[A_Index + 1])
+        }
+
+        left := this.Sort(left)
+        right := this.Sort(right)
+
+        result := left
+        result.Push(pivot)
+        loop (right.Length)
+            result.Push(right[A_Index])
+
+        return result
+    }
+}
+
+class DataProcessor {
+    _strategy := ""
+
+    __New(strategy) {
+        this._strategy := strategy
+    }
+
+    SetStrategy(strategy) {
+        this._strategy := strategy
+    }
+
+    Process(arr) {
+        return this._strategy.Sort(arr)
+    }
+}
+
+processor := DataProcessor(BubbleSort())
+data := [5, 2, 8, 1, 9]
+sorted := processor.Process(data)
+MsgBox("BubbleSort: " . sorted[1] . ", " . sorted[2])
+
+processor.SetStrategy(QuickSort())
+sorted := processor.Process(data)
+MsgBox("QuickSort: " . sorted[1] . ", " . sorted[2])
+
+; Dependency Injection
+class EmailService {
+    Send(to, subject, body) {
+        return "Email sent to " . to
+    }
+}
+
+class SMSService {
+    Send(number, message) {
+        return "SMS sent to " . number
+    }
+}
+
+class NotificationService {
+    _emailService := ""
+    _smsService := ""
+
+    __New(emailService, smsService) {
+        this._emailService := emailService
+        this._smsService := smsService
+    }
+
+    NotifyViaEmail(email, subject, body) {
+        return this._emailService.Send(email, subject, body)
+    }
+
+    NotifyViaSMS(phone, message) {
+        return this._smsService.Send(phone, message)
+    }
+}
+
+emailSvc := EmailService()
+smsSvc := SMSService()
+notifier := NotificationService(emailSvc, smsSvc)
+
+MsgBox(notifier.NotifyViaEmail("user@example.com", "Hello", "Welcome"))
+MsgBox(notifier.NotifyViaSMS("+1234567890", "Hello!"))
+
+; Delegation Pattern
+class RealSubject {
+    Request() {
+        return "Expensive operation completed"
+    }
+}
+
+class Proxy {
+    _realSubject := ""
+    _cache := ""
+    _isCached := false
+
+    Request() {
+        if (!this._isCached) {
+            this._realSubject := RealSubject()
+            this._cache := this._realSubject.Request()
+            this._isCached := true
+        }
+        return this._cache
+    }
+}
+
+proxy := Proxy()
+MsgBox(proxy.Request())  ; First call
+MsgBox(proxy.Request())  ; Cached response
+
+; Decorator Pattern
+class Component {
+    Operation() {
+        throw Error("Must implement Operation()")
+    }
+}
+
+class ConcreteComponent extends Component {
+    Operation() {
+        return "ConcreteComponent"
+    }
+}
+
+class Decorator extends Component {
+    _component := ""
+
+    __New(component) {
+        this._component := component
+    }
+
+    Operation() {
+        return this._component.Operation()
+    }
+}
+
+class ColorDecorator extends Decorator {
+    Operation() {
+        return super.Operation() . " + Color"
+    }
+}
+
+class BorderDecorator extends Decorator {
+    Operation() {
+        return super.Operation() . " + Border"
+    }
+}
+
+component := ConcreteComponent()
+component := ColorDecorator(component)
+component := BorderDecorator(component)
+
+MsgBox(component.Operation())  ; ConcreteComponent + Color + Border

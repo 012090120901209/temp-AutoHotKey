@@ -1,0 +1,165 @@
+; Advanced Input Capture and Processing
+; Demonstrates advanced input handling, validation, and transformation
+
+; Input with validation and transformation
+CaptureInput(prompt := "Enter value:", validationFn := unset, transformFn := unset) {
+    InputBox userInput, , , %prompt%
+
+    if (ErrorLevel) {
+        return ""
+    }
+
+    if (validationFn != unset && !validationFn(userInput)) {
+        MsgBox("Invalid input")
+        return ""
+    }
+
+    if (transformFn != unset) {
+        userInput := transformFn(userInput)
+    }
+
+    return userInput
+}
+
+; Numeric input with range validation
+GetNumericInput(prompt := "Enter number:", min := unset, max := unset) {
+    value := CaptureInput(
+        prompt,
+        (input) => IsNumber(input) && (min = unset || input >= min) && (max = unset || input <= max),
+        (input) => input + 0  ; Convert to number
+    )
+    return value != "" ? value : 0
+}
+
+result := GetNumericInput("Enter age (0-120):", 0, 120)
+MsgBox("Entered: " . result)
+
+; Email input validation
+GetEmailInput() {
+    return CaptureInput(
+        "Enter email address:",
+        (email) => (InStr(email, "@") && InStr(email, "."))
+    )
+}
+
+; Password input with strength checking
+PasswordValidator(password) {
+    if (StrLen(password) < 8)
+        return false
+
+    hasUpper := RegExMatch(password, "[A-Z]")
+    hasLower := RegExMatch(password, "[a-z]")
+    hasNumber := RegExMatch(password, "[0-9]")
+    hasSpecial := RegExMatch(password, "[!@#$%^&*]")
+
+    return hasUpper && hasLower && hasNumber && hasSpecial
+}
+
+; Sequential input with validation
+InputSequence(prompts*) {
+    results := []
+
+    for prompt in prompts {
+        InputBox value, , , %prompt%
+
+        if (ErrorLevel) {
+            return []
+        }
+
+        results.Push(value)
+    }
+
+    return results
+}
+
+responses := InputSequence(
+    "First name:",
+    "Last name:",
+    "Email:"
+)
+
+if (responses.Length > 0) {
+    MsgBox("Name: " . responses[1] . " " . responses[2])
+}
+
+; Input with autocomplete suggestions
+SelectFromList(items*) {
+    selected := ""
+    count := items.Length
+
+    listStr := ""
+    loop count {
+        listStr .= items[A_Index] . "|"
+    }
+
+    GuiNew()
+    Gui Add, ListBox, x10 y10 w300 h200 vSelectedItem, %listStr%
+    Gui Add, Button, x10 y220 w90 h30, OK
+    Gui Show, w320 h260, Select Item
+
+    GuiCtrlEvent(GuiCtrlObj, GuiEvent, Info) {
+        if (GuiEvent = "Click") {
+            GuiCtrlGet selectedVal, , SelectedItem
+            selected := selectedVal
+            GuiDestroy()
+        }
+    }
+
+    return selected
+}
+
+; Parsed input into structured data
+ParseInput(input) {
+    parts := StrSplit(input, ",")
+    data := Map()
+
+    for idx, part in parts {
+        trimmed := StrTrim(part)
+        if (idx = 1)
+            data["first"] := trimmed
+        else if (idx = 2)
+            data["last"] := trimmed
+        else if (idx = 3)
+            data["email"] := trimmed
+    }
+
+    return data
+}
+
+parsed := ParseInput("John, Doe, john@example.com")
+MsgBox("First: " . parsed["first"] . ", Last: " . parsed["last"])
+
+; Multi-line input
+CaptureMultilineInput(prompt := "Enter text (click OK when done):", lines := 5) {
+    GuiNew()
+    Gui Add, Edit, x10 y10 w400 h200 vUserInput,
+    Gui Add, Button, x10 y220 w100 h30, OK
+    Gui Show, w420 h260, %prompt%
+
+    output := ""
+
+    GuiCtrlEvent(GuiCtrlObj, GuiEvent, Info) {
+        if (GuiEvent = "Click") {
+            GuiCtrlGet output, , UserInput
+            GuiDestroy()
+        }
+    }
+
+    return output
+}
+
+; Input filtering (only alphanumeric)
+FilterInput(input, allowedChars := "alphanumeric") {
+    switch allowedChars {
+        case "alphanumeric":
+            return RegExReplace(input, "[^A-Za-z0-9]", "")
+        case "numeric":
+            return RegExReplace(input, "[^0-9]", "")
+        case "letters":
+            return RegExReplace(input, "[^A-Za-z]", "")
+    }
+    return input
+}
+
+filtered := FilterInput("Hello@123!", "alphanumeric")
+MsgBox("Filtered: " . filtered)  ; Hello123

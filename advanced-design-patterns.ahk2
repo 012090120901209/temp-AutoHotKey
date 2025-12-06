@@ -1,0 +1,156 @@
+; Advanced Design Patterns: Factory, Singleton, Observer
+; Demonstrates common object-oriented design patterns
+
+; Factory Pattern
+class Logger {
+    Log(msg) {
+        MsgBox("[LOG] " . msg)
+    }
+}
+
+class ConsoleLogger extends Logger {
+    Log(msg) {
+        OutputDebug("[CONSOLE] " . msg)
+    }
+}
+
+class FileLogger extends Logger {
+    filename := ""
+
+    __New(filename) {
+        this.filename := filename
+    }
+
+    Log(msg) {
+        FileAppend("[FILE] " . msg . "`n", this.filename)
+    }
+}
+
+LoggerFactory(type, param := "") {
+    switch type {
+        case "console":
+            return ConsoleLogger()
+        case "file":
+            return FileLogger(param)
+        default:
+            return Logger()
+    }
+}
+
+logger1 := LoggerFactory("console")
+logger2 := LoggerFactory("file", "output.txt")
+logger1.Log("Console message")
+logger2.Log("File message")
+
+; Singleton Pattern
+class DatabaseConnection {
+    static _instance := unset
+
+    _connected := false
+    _connString := ""
+
+    __New() {
+        if (DatabaseConnection._instance != unset)
+            throw Error("Use GetInstance() instead of new")
+    }
+
+    static GetInstance() {
+        if (this._instance = unset)
+            this._instance := DatabaseConnection()
+        return this._instance
+    }
+
+    Connect(connString) {
+        this._connString := connString
+        this._connected := true
+        return "Connected to: " . connString
+    }
+
+    IsConnected() {
+        return this._connected
+    }
+}
+
+db1 := DatabaseConnection.GetInstance()
+db2 := DatabaseConnection.GetInstance()
+MsgBox(db1.Connect("Server=localhost;DB=test"))
+MsgBox(db2.IsConnected() ? "DB is connected" : "DB not connected")
+
+; Observer Pattern
+class EventEmitter {
+    _listeners := Map()
+
+    On(event, callback) {
+        if (!this._listeners.Has(event))
+            this._listeners[event] := []
+        this._listeners[event].Push(callback)
+    }
+
+    Emit(event, data := "") {
+        if (this._listeners.Has(event)) {
+            for callback in this._listeners[event] {
+                callback(data)
+            }
+        }
+    }
+
+    Off(event, callback) {
+        if (this._listeners.Has(event)) {
+            listeners := this._listeners[event]
+            for idx, cb in listeners {
+                if (cb = callback) {
+                    listeners.RemoveAt(idx)
+                    break
+                }
+            }
+        }
+    }
+}
+
+emitter := EventEmitter()
+
+emitter.On("user:login", (user) => MsgBox("User logged in: " . user))
+emitter.On("user:logout", (user) => MsgBox("User logged out: " . user))
+
+emitter.Emit("user:login", "Alice")
+emitter.Emit("user:logout", "Bob")
+
+; Builder Pattern
+class ConfigBuilder {
+    config := Map()
+
+    SetHost(host) {
+        this.config["host"] := host
+        return this
+    }
+
+    SetPort(port) {
+        this.config["port"] := port
+        return this
+    }
+
+    SetTimeout(timeout) {
+        this.config["timeout"] := timeout
+        return this
+    }
+
+    SetRetries(retries) {
+        this.config["retries"] := retries
+        return this
+    }
+
+    Build() {
+        return this.config.Clone()
+    }
+}
+
+config := ConfigBuilder()
+    .SetHost("localhost")
+    .SetPort(8080)
+    .SetTimeout(5000)
+    .SetRetries(3)
+    .Build()
+
+for key, value in config {
+    MsgBox(key . ": " . value)
+}

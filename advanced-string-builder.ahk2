@@ -1,0 +1,308 @@
+; Advanced String Building and Formatting
+; Demonstrates efficient string concatenation, templating, and formatting
+
+class StringBuilder {
+    _parts := []
+    _separator := ""
+
+    __New(separator := "") {
+        this._separator := separator
+    }
+
+    Append(text) {
+        this._parts.Push(text)
+        return this
+    }
+
+    AppendLine(text := "") {
+        this._parts.Push(text)
+        this._parts.Push("`n")
+        return this
+    }
+
+    AppendIf(condition, text) {
+        if (condition)
+            this._parts.Push(text)
+        return this
+    }
+
+    AppendRepeat(text, count) {
+        loop count
+            this._parts.Push(text)
+        return this
+    }
+
+    Clear() {
+        this._parts := []
+        return this
+    }
+
+    Length() {
+        return this._parts.Length
+    }
+
+    ToString() {
+        return this._separator ? StrJoin(this._separator, this._parts) :
+            (result := "", (loop this._parts.Length result .= this._parts[A_Index]), result)
+    }
+
+    StrJoin(sep, arr) {
+        result := ""
+        for item in arr
+            result .= (result ? sep : "") . item
+        return result
+    }
+}
+
+sb := StringBuilder(", ")
+sb.Append("Hello")
+sb.Append("World")
+sb.Append("!")
+MsgBox(sb.ToString())  ; Hello, World, !
+
+; String formatter
+class StringFormatter {
+    static Format(template, values := Map()) {
+        result := template
+
+        for key, value in values {
+            result := StrReplace(result, "{" . key . "}", value)
+        }
+
+        return result
+    }
+
+    static FormatArgs(template, args*) {
+        result := template
+
+        for idx, value in args {
+            result := StrReplace(result, "{" . (idx - 1) . "}", value)
+        }
+
+        return result
+    }
+
+    static PadLeft(text, length, padChar := " ") {
+        while (StrLen(text) < length) {
+            text := padChar . text
+        }
+        return SubStr(text, 1, length)
+    }
+
+    static PadRight(text, length, padChar := " ") {
+        while (StrLen(text) < length) {
+            text .= padChar
+        }
+        return SubStr(text, 1, length)
+    }
+
+    static Center(text, length) {
+        padding := (length - StrLen(text)) / 2
+        leftPad := Floor(padding)
+        rightPad := Ceil(padding)
+
+        return StrReplace(" ", "", "", leftPad) . text .
+            StrReplace(" ", "", "", rightPad)
+    }
+
+    static Repeat(text, count) {
+        result := ""
+        loop count
+            result .= text
+        return result
+    }
+
+    static Reverse(text) {
+        result := ""
+        loop StrLen(text)
+            result := SubStr(text, A_Index, 1) . result
+        return result
+    }
+}
+
+formatted := StringFormatter.Format("Hello {name}, you are {age} years old",
+    Map("name", "John", "age", 30))
+MsgBox(formatted)
+
+padded := StringFormatter.PadLeft("123", 6, "0")
+MsgBox(padded)  ; 000123
+
+; Template engine
+class TemplateEngine {
+    _templates := Map()
+    _filters := Map()
+    _variables := Map()
+
+    RegisterTemplate(name, template) {
+        this._templates[name] := template
+        return this
+    }
+
+    RegisterFilter(name, filterFn) {
+        this._filters[name] := filterFn
+        return this
+    }
+
+    SetVariable(name, value) {
+        this._variables[name] := value
+        return this
+    }
+
+    Render(templateName, variables := Map()) {
+        if (!this._templates.Has(templateName))
+            return ""
+
+        template := this._templates[templateName]
+
+        ; Merge variables
+        for key, value in this._variables {
+            if (!variables.Has(key))
+                variables[key] := value
+        }
+
+        ; Replace variables
+        for key, value in variables {
+            template := StrReplace(template, "{{" . key . "}}", value)
+        }
+
+        ; Apply filters
+        for key, filterFn in this._filters {
+            pattern := "{{" . key . "|([^}]+)}}"
+            pos := 1
+
+            while (pos := RegExMatch(template, pattern, match, pos)) {
+                filtered := filterFn(match[1])
+                template := StrReplace(template, match[0], filtered, , 1)
+                pos += StrLen(filtered)
+            }
+        }
+
+        return template
+    }
+}
+
+engine := TemplateEngine()
+engine.RegisterTemplate("greeting",
+    "Hello {{name}}, welcome to {{place}}!")
+
+result := engine.Render("greeting",
+    Map("name", "Alice", "place", "AHK"))
+MsgBox(result)
+
+; Diff/comparison
+class StringDiff {
+    static LevenshteinDistance(s1, s2) {
+        len1 := StrLen(s1)
+        len2 := StrLen(s2)
+
+        if (len1 = 0)
+            return len2
+        if (len2 = 0)
+            return len1
+
+        ; Create distance matrix
+        d := []
+        loop len1 + 1
+            d[A_Index] := []
+
+        loop len1 + 1
+            d[A_Index][1] := A_Index - 1
+
+        loop len2 + 1
+            d[1][A_Index] := A_Index - 1
+
+        loop len1 {
+            i := A_Index
+            loop len2 {
+                j := A_Index
+                cost := SubStr(s1, i, 1) != SubStr(s2, j, 1) ? 1 : 0
+
+                d[i + 1][j + 1] := Min(
+                    d[i][j + 1] + 1,
+                    d[i + 1][j] + 1,
+                    d[i][j] + cost
+                )
+            }
+        }
+
+        return d[len1 + 1][len2 + 1]
+    }
+
+    static Similarity(s1, s2) {
+        distance := this.LevenshteinDistance(s1, s2)
+        maxLen := Max(StrLen(s1), StrLen(s2))
+
+        return maxLen = 0 ? 1.0 : (1.0 - (distance / maxLen))
+    }
+
+    Min(a, b, c) {
+        return a < b ? (a < c ? a : c) : (b < c ? b : c)
+    }
+
+    Max(a, b) {
+        return a > b ? a : b
+    }
+}
+
+dist := StringDiff.LevenshteinDistance("kitten", "sitting")
+MsgBox("Distance: " . dist)  ; 3
+
+similarity := StringDiff.Similarity("hello", "hallo")
+MsgBox("Similarity: " . Format("{:.2f}%", similarity * 100))
+
+; Word counter and analyzer
+class TextAnalyzer {
+    _text := ""
+
+    __New(text := "") {
+        this._text := text
+    }
+
+    SetText(text) {
+        this._text := text
+        return this
+    }
+
+    CountWords() {
+        words := StrSplit(Trim(this._text), " ")
+        return words.Length
+    }
+
+    CountLines() {
+        lines := StrSplit(this._text, "`n")
+        return lines.Length
+    }
+
+    CountCharacters() {
+        return StrLen(this._text)
+    }
+
+    GetWordFrequency() {
+        words := StrSplit(StrLower(this._text), " ")
+        frequency := Map()
+
+        for word in words {
+            word := StrTrim(word, " `t`n`r.,!?;:")
+            if (word != "") {
+                freq := frequency.Has(word) ? frequency[word] + 1 : 1
+                frequency[word] := freq
+            }
+        }
+
+        return frequency
+    }
+
+    GetReadingTime(wordsPerMinute := 200) {
+        wordCount := this.CountWords()
+        minutes := wordCount / wordsPerMinute
+
+        return Format("{:.1f} minutes", minutes)
+    }
+}
+
+text := "Hello world. Hello there. World is beautiful."
+analyzer := TextAnalyzer(text)
+
+MsgBox("Words: " . analyzer.CountWords())
+MsgBox("Characters: " . analyzer.CountCharacters())
+MsgBox("Reading time: " . analyzer.GetReadingTime())
